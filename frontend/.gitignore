@@ -1,0 +1,14 @@
+node_modules
+dist
+# Python backend files
+backend/uploads/
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/.venv/
+backend/env/
+backend/venv/
+backend/shiftdb.db
+# Environment files
+.env

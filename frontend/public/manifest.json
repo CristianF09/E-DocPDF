@@ -1,0 +1,9 @@
+{
+  "name": "E-DocPDF - Procesare PDF Profesională",
+  "short_name": "E-DocPDF",
+  "description": "Platform pentru generare și administrare documente",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5"
+}

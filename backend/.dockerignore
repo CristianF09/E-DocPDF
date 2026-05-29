@@ -1,0 +1,44 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+
+# Virtual Environment
+.venv
+venv
+ENV
+env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files
+.env.local
+.env.*.local
+
+# Uploads (păstrăm directorul dar nu fișierele)
+uploads/*.pdf
+uploads/*.docx
+uploads/*.zip
+!uploads/.gitkeep
+
+# Git
+.git
+.gitignore
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

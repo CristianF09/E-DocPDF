@@ -1,0 +1,217 @@
+// frontend/src/lib/api.js
+import { API_BASE_URL } from './app-params';
+
+class ApiService {
+  constructor() {
+    this.baseURL = API_BASE_URL || '/api';   // fallback la '/api'
+    this.token = localStorage.getItem('edocpdf_token');
+  }
+
+  setToken(token) {
+    this.token = token;
+    localStorage.setItem('edocpdf_token', token);
+  }
+
+  clearToken() {
+    this.token = null;
+    localStorage.removeItem('edocpdf_token');
+  }
+
+  _getAuthHeaders() {
+    const headers = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    return headers;
+  }
+
+  async _authenticatedRequest(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    const headers = {
+      ...this._getAuthHeaders(),
+      ...options.headers,
+    };
+
+    const response = await fetch(url, { ...options, headers });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Cererea a eșuat cu status ${response.status}`);
+    }
+    return response.json();
+  }
+
+  // ========== Autentificare ==========
+  async login(username, password) {
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
+
+    try {
+      const response = await fetch(`${this.baseURL}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Autentificare eșuată');
+      }
+
+      const data = await response.json();
+      this.setToken(data.access_token);
+      const user = await this.getCurrentUser();
+      return { ...data, user };
+    } catch (error) {
+      console.error('Eroare login:', error);
+      throw error;
+    }
+  }
+
+  async getCurrentUser() {
+    return this._authenticatedRequest('/users/me/');
+  }
+
+  async getDocuments() {
+    return this._authenticatedRequest('/documents/');
+  }
+
+  async uploadDocument(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/upload/`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Încărcarea a eșuat');
+    return response.json();
+  }
+
+  async deleteDocument(documentId) {
+    return this._authenticatedRequest(`/documents/${documentId}`, { method: 'DELETE' });
+  }
+
+  // ========== Procesare PDF ==========
+  async mergePDFs(files) {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+    const response = await fetch(`${this.baseURL}/process/merge`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Îmbinarea PDF-urilor a eșuat');
+    return response.blob();
+  }
+
+  async splitPDF(file, pageRanges) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('page_ranges', pageRanges);
+    const response = await fetch(`${this.baseURL}/process/split`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Împărțirea PDF-ului a eșuat');
+    return response.blob();
+  }
+
+  async compressPDF(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/process/compress`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Comprimarea PDF-ului a eșuat');
+    return response.blob();
+  }
+
+  async convertToPDF(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/convert/to-pdf`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Conversia în PDF a eșuat');
+    return response.blob();
+  }
+
+  async convertToWord(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/convert/to-word`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Conversia PDF->Word a eșuat');
+    return response.blob();
+  }
+
+  async convertToExcel(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/convert/to-excel`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Conversia PDF->Excel a eșuat');
+    return response.blob();
+  }
+
+  // ========== Traducere + OCR ==========
+  async translateOCR(file, sourceLang, targetLang) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('source_lang', sourceLang);
+    formData.append('target_lang', targetLang);
+    const response = await fetch(`${this.baseURL}/process/ocr-translate`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('OCR + traducere a eșuat');
+    return response.json();
+  }
+
+  // ========== Semnătură ==========
+  async addSignature(file, signatureImageBlob, x = 100, y = 100, page = 1) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('signature_image', signatureImageBlob, 'signature.png');
+    formData.append('x', String(x));
+    formData.append('y', String(y));
+    formData.append('page', String(page));
+    const response = await fetch(`${this.baseURL}/process/sign`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Aplicarea semnăturii a eșuat');
+    return response.blob();
+  }
+
+  // ========== Generare document juridic ==========
+  async generateLegalDocument(templateId, variables) {
+    const response = await fetch(`${this.baseURL}/legal/generate`, {
+      method: 'POST',
+      headers: {
+        ...this._getAuthHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ template_id: templateId, variables })
+    });
+    if (!response.ok) throw new Error('Generarea documentului a eșuat');
+    return response.blob();
+  }
+}
+
+export const apiService = new ApiService();
+export default apiService;

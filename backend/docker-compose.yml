@@ -1,0 +1,45 @@
+
+services:
+  stirling-pdf:
+    image: frooodle/s-pdf:latest
+    container_name: stirling-pdf
+    ports:
+      - "8080:8080"
+    environment:
+      - DOCKER_ENABLE_SECURITY=false
+      - SECURITY_ENABLE_LOGIN=false
+      - SYSTEM_DEFAULTLOCALE=ro
+      - UI_DOCUMENT_LANGUAGE=ro
+    volumes:
+      - stirling-data:/usr/share/fonts
+      - stirling-config:/configs
+    restart: unless-stopped
+    networks:
+      - edocpdf-network
+
+  backend:
+    build: .
+    container_name: edocpdf-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - STIRLING_URL=http://stirling-pdf:8080/api/v1
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./templates:/app/templates
+      - ./analytics.py:/app/analytics.py
+    depends_on:
+      - stirling-pdf
+    restart: unless-stopped
+    networks:
+      - edocpdf-network
+
+volumes:
+  stirling-data:
+  stirling-config:
+
+networks:
+  edocpdf-network:
+    driver: bridge
