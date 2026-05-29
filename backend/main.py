@@ -29,17 +29,16 @@ STIRLING_URL = os.getenv("STIRLING_URL", "http://localhost:8080/api/v1")
 # Configurare Google Gemini AI
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 AI_AVAILABLE = False
-ai_model = None
+ai_client = None
 
 if GOOGLE_API_KEY and GOOGLE_API_KEY != "your-google-api-key-here":
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=GOOGLE_API_KEY)
-        ai_model = genai.GenerativeModel('gemini-1.5-flash')
+        import google.genai as genai
+        ai_client = genai.Client()
         AI_AVAILABLE = True
         print("✅ Google Gemini AI initialized successfully")
     except ImportError:
-        print("⚠️ google-generativeai not installed. Run: pip install google-generativeai")
+        print("⚠️ google.genai not installed. Run: pip install google-genai")
     except Exception as e:
         print(f"⚠️ Failed to initialize AI: {e}")
 else:
@@ -118,22 +117,7 @@ class TranslationRequest(BaseModel):
     file: Optional[str] = None
 
 # ========== Date utilizatori test ==========
-fake_users_db = {
-    "testuser": {
-        "username": "testuser",
-        "full_name": "Test User",
-        "email": "test@example.com",
-        "hashed_password": pwd_context.hash("testpass123"),
-        "disabled": False,
-    },
-    "admin": {
-        "username": "admin",
-        "full_name": "Administrator",
-        "email": "admin@edocpdf.ro",
-        "hashed_password": pwd_context.hash("admin123"),
-        "disabled": False,
-    }
-}
+fake_users_db = {}
 documents_db = []
 
 # ========== Funcții helper ==========
@@ -215,6 +199,13 @@ async def root():
             "signatures": "/signatures"
         }
     }
+
+@app.get("/stirling-health")
+async def stirling_health_check():
+    if check_stirling_health():
+        return {"status": "ok"}
+    else:
+        raise HTTPException(status_code=503, detail="Stirling PDF service not available")
 
 @app.get("/editor", response_class=HTMLResponse)
 async def document_editor():
@@ -432,7 +423,10 @@ async def ocr_and_translate(
         {extracted_text[:30000]}
         """
         
-        response = ai_model.generate_content(prompt)
+        response = ai_client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=[prompt]
+        )
         translated_text = response.text
         
         return {

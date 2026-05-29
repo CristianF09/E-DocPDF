@@ -2,7 +2,6 @@
 
 // ========== CONFIGURARE BASE URL ==========
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-export const STIRLING_URL = import.meta.env.VITE_STIRLING_URL || 'http://localhost:8080';
 
 // ========== ENDPOINT-URI BACKEND SHIFTPDF ==========
 export const API_ENDPOINTS = {
@@ -45,21 +44,10 @@ export const API_ENDPOINTS = {
   
   // Utilitare
   health: '/',
-  stirling_health: `${STIRLING_URL}/health`
+  stirling_health: '/stirling-health'
 };
 
-// ========== ENDPOINT-URI PENTRU STIRLING PDF ==========
-export const STIRLING_ENDPOINTS = {
-  merge: `${STIRLING_URL}/api/v1/general/merge-pdfs`,
-  split: `${STIRLING_URL}/api/v1/general/split-pages`,
-  compress: `${STIRLING_URL}/api/v1/general/compress-pdf`,
-  convert: `${STIRLING_URL}/api/v1/general/convert-file-to-pdf`,
-  ocr: `${STIRLING_URL}/api/v1/ocr/pdf-to-ocr`,
-  add_image: `${STIRLING_URL}/api/v1/general/add-image`,
-  rotate: `${STIRLING_URL}/api/v1/general/rotate-pdf`,
-  watermark: `${STIRLING_URL}/api/v1/general/add-watermark`,
-  extract_text: `${STIRLING_URL}/api/v1/general/extract-text`
-};
+
 
 // ========== CONFIGURARE APLICAȚIE ==========
 const isNode = typeof window === 'undefined';
@@ -233,10 +221,6 @@ export const configUtils = {
     return `${API_BASE_URL}${endpoint}`;
   },
   
-  getStirlingUrl: (endpoint) => {
-    return `${STIRLING_URL}${endpoint}`;
-  },
-  
   isBackendAvailable: async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/`);
@@ -248,7 +232,8 @@ export const configUtils = {
   
   isStirlingAvailable: async () => {
     try {
-      const response = await fetch(`${STIRLING_URL}/health`);
+      // Verificarea se face acum printr-un endpoint al backend-ului
+      const response = await fetch(`${API_BASE_URL}/stirling-health`);
       return response.ok;
     } catch {
       return false;

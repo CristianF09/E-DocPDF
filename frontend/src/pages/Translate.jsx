@@ -8,10 +8,11 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { apiService } from '@/lib/api';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.js?url';
-
 // Configurare PDF.js worker local (fără CORS)
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url,
+).toString();
 
 const languageOptions = [
   { value: 'eng', label: 'English' },
