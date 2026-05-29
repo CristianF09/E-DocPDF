@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
+import { Lightbulb } from 'lucide-react';
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
@@ -11,7 +12,7 @@ import Footer from '@/components/layout/Footer';
 import Home from './pages/Home';
 import TemplateEditor from './pages/TemplateEditor';
 import Templates from './pages/Templates';
-import Sign from './pages/Sign';
+import SignPage from './pages/Sign';
 import DocumentEditor from './pages/DocumentEditor';
 import MyDocuments from './pages/MyDocuments';
 import Converter from './pages/Converter';
@@ -22,6 +23,11 @@ import Pricing from './pages/Pricing';
 import Settings from './pages/Settings';
 import Contact from './pages/Contact';
 import Login from './pages/Login';
+import OcrPage from './pages/Ocr';
+
+import WatermarkPage from './pages/Watermark';
+import SummarizePage from './pages/Summarize';
+import AnalyzePage from './pages/Analyze';
 
 const Layout = ({ children }) => (
   <div className="min-h-screen bg-background flex flex-col">
@@ -65,7 +71,7 @@ const AuthenticatedApp = () => {
       <Route path="/templates/:templateId" element={<Layout><TemplateEditor /></Layout>} />
       <Route path="/converter" element={<Layout><Converter /></Layout>} />
       <Route path="/translate" element={<Layout><Translate /></Layout>} />
-      <Route path="/sign" element={<Layout><Sign /></Layout>} />
+      <Route path="/sign" element={<Layout><SignPage /></Layout>} />
       <Route path="/tools" element={<Layout><Tools /></Layout>} />
       <Route path="/settings" element={<Layout><Settings /></Layout>} />
       <Route path="/contact" element={<Layout><Contact /></Layout>} />
@@ -73,11 +79,14 @@ const AuthenticatedApp = () => {
       <Route path="/tools/merge" element={<Layout><Converter /></Layout>} />
       <Route path="/tools/split" element={<Layout><Converter /></Layout>} />
       <Route path="/tools/rotate" element={<Layout><Converter /></Layout>} />
-      <Route path="/tools/watermark" element={<Layout><Converter /></Layout>} />
+      <Route path="/tools/watermark" element={<Layout><WatermarkPage /></Layout>} />
       <Route path="/tools/protect" element={<Layout><Converter /></Layout>} />
       <Route path="/tools/unlock" element={<Layout><Converter /></Layout>} />
+      <Route path="/tools/ocr" element={<Layout><OcrPage /></Layout>} />
       <Route path="/about" element={<Layout><AboutPage /></Layout>} />
       <Route path="/tools/ai-edit" element={<Layout><Converter /></Layout>} />
+      <Route path="/tools/ai-summarize" element={<Layout><SummarizePage /></Layout>} />
+      <Route path="/tools/ai-analyze" element={<Layout><AnalyzePage /></Layout>} />
       <Route path="*" element={<Layout><PageNotFound /></Layout>} />
     </Routes>
   );
@@ -87,14 +96,13 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Router>
           <AuthenticatedApp />
         </Router>
         <Toaster />
       </QueryClientProvider>
     </AuthProvider>
   );
-
 }
 
 export default App;

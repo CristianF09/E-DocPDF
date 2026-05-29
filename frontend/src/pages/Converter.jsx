@@ -17,10 +17,22 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 // NOTĂ: Am eliminat importurile CSS care cauzau eroare.
 // Previzualizarea funcționează și fără ele.
 
-const conversionMap = {
-  'pdf-to-docx': { method: 'convertToWord', outputExt: 'docx', label: 'PDF → Word' },
-  'pdf-to-xlsx': { method: 'convertToExcel', outputExt: 'xlsx', label: 'PDF → Excel' },
-  'pdf-to-txt': { method: 'extractText', outputExt: 'txt', label: 'PDF → Text' },
+const conversionOptions = {
+  pdf: [
+    { value: 'docx', label: 'Word (DOCX)' },
+    { value: 'xlsx', label: 'Excel (XLSX)' },
+    { value: 'pptx', label: 'PowerPoint (PPTX)' },
+    { value: 'txt', label: 'Text (TXT)' },
+  ],
+  docx: [{ value: 'pdf', label: 'PDF' }],
+  doc: [{ value: 'pdf', label: 'PDF' }],
+  xlsx: [{ value: 'pdf', label: 'PDF' }],
+  xls: [{ value: 'pdf', label: 'PDF' }],
+  pptx: [{ value: 'pdf', label: 'PDF' }],
+  ppt: [{ value: 'pdf', label: 'PDF' }],
+  jpg: [{ value: 'pdf', label: 'PDF' }],
+  jpeg: [{ value: 'pdf', label: 'PDF' }],
+  png: [{ value: 'pdf', label: 'PDF' }],
 };
 
 export default function Converter() {
@@ -35,7 +47,25 @@ export default function Converter() {
   const [fileType, setFileType] = useState(null);
   const [numPages, setNumPages] = useState(null);
   const fileInputRef = useRef(null);
-  const currentOp = conversionMap[toolParam] || null;
+
+  const availableConversions = fileType ? conversionOptions[fileType] || [] : [];
+
+  useEffect(() => {
+    // Resetează formatul țintă la schimbarea fișierului
+    setTargetFormat('');
+  }, [file]);
+
+  const getPageTitle = () => {
+    if (isConverting) return 'Se convertește...';
+    if (convertedFile) return 'Conversie finalizată';
+    if (targetFormat && fileType) {
+      const from = fileType.toUpperCase();
+      const to = targetFormat.toUpperCase();
+      return `Conversie ${from} în ${to}`;
+    }
+    return 'Convertor Documente';
+  };
+  
   const getFileIcon = () => {
     if (!file) return <FileType className="w-12 h-12 text-gray-400" />;
     const ext = file.name.split('.').pop()?.toLowerCase();
@@ -83,67 +113,39 @@ export default function Converter() {
 
   const handleConvert = async () => {
     if (!file) {
-      toast.error('Selectează un fișier.');
-      return;
-    }
-
-    if (currentOp) {
-      setIsConverting(true);
-      try {
-        let blob;
-        if (currentOp.method === 'convertToWord') {
-          blob = await apiService.convertToWord(file);
-        } else if (currentOp.method === 'convertToExcel') {
-          blob = await apiService.convertToExcel(file);
-        } else if (currentOp.method === 'extractText') {
-          const result = await apiService.extractTextFromPDF(file);
-          blob = new Blob([result.text || ''], { type: 'text/plain' });
-        } else {
-          throw new Error('Operație necunoscută');
-        }
-        const url = URL.createObjectURL(blob);
-        setConvertedFile(blob);
-        setConvertedFileUrl(url);
-        toast.success(`✅ Conversie reușită! ${currentOp.label}`);
-      } catch (err) {
-        console.error(err);
-        toast.error(err.message || 'Conversie eșuată');
-      } finally {
-        setIsConverting(false);
-      }
-      return;
-    }
-
-    if (!targetFormat) {
-      toast.error('Selectează un format țintă.');
-      return;
-    }
-
-    const sourceExt = file.name.split('.').pop()?.toLowerCase();
-    const key = `${sourceExt}-to-${targetFormat}`;
-    const op = conversionMap[key];
-
-    if (!op) {
-      toast.error(`Conversia din ${sourceExt.toUpperCase()} în ${targetFormat.toUpperCase()} nu este suportată momentan.`);
+      toast.error('Vă rugăm să selectați un fișier.');
       return;
     }
 
     setIsConverting(true);
     try {
       let blob;
-      if (op.method === 'convertToWord') blob = await apiService.convertToWord(file);
-      else if (op.method === 'convertToExcel') blob = await apiService.convertToExcel(file);
-      else if (op.method === 'extractText') {
-        const result = await apiService.extractTextFromPDF(file);
-        blob = new Blob([result.text || ''], { type: 'text/plain' });
-      } else throw new Error('Metodă necunoscută');
+      // Verifică dacă operația curentă este 'compress'
+      if (currentOp && currentOp.id === 'compress') {
+        blob = await apiService.stirlingCompress(file);
+        toast.success(`✅ Comprimare reușită! Fișierul este gata pentru descărcare.`);
+      } else {
+        // Logica existentă pentru conversie
+        let finalTargetFormat = targetFormat;
+        if (currentOp) {
+          finalTargetFormat = currentOp.outputExt;
+        }
+        if (!finalTargetFormat) {
+          toast.error('Vă rugăm să selectați un format țintă.');
+          setIsConverting(false);
+          return;
+        }
+        blob = await apiService.stirlingConvert(file, finalTargetFormat);
+        toast.success(`✅ Conversie reușită! Fișierul este gata pentru descărcare.`);
+      }
+      
       const url = URL.createObjectURL(blob);
       setConvertedFile(blob);
       setConvertedFileUrl(url);
-      toast.success(`✅ Conversie reușită! ${op.label}`);
+
     } catch (err) {
-      console.error(err);
-      toast.error(err.message || 'Conversie eșuată');
+      console.error("Eroare la procesare:", err);
+      toast.error(err.message || 'Procesarea a eșuat. Vă rugăm să încercați din nou.');
     } finally {
       setIsConverting(false);
     }
@@ -227,12 +229,10 @@ export default function Converter() {
     <div className="p-6 pb-24 md:pb-6 max-w-4xl mx-auto">
       <div className="mb-8 text-center">
         <h1 className="text-4xl font-bold font-space gradient-text">
-          {currentOp ? currentOp.label : 'Convertor Documente'}
+          {getPageTitle()}
         </h1>
         <p className="text-muted-foreground mt-2">
-          {currentOp 
-            ? `Conversie rapidă folosind serverul local E-DocPDF.`
-            : 'Selectează fișierul și formatul dorit. Conversiile sunt procesate local, fără a părăsi serverul.'}
+          Selectează fișierul și formatul dorit. Conversiile sunt procesate local, fără a părăsi serverul.
         </p>
       </div>
 
@@ -277,7 +277,7 @@ export default function Converter() {
           </AnimatePresence>
         </div>
 
-        {file && !currentOp && (
+        {file && availableConversions.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6 flex flex-col sm:flex-row items-center gap-4">
             <div className="flex items-center gap-3 flex-1">
               <div className="bg-secondary rounded-lg px-4 py-2 text-sm">
@@ -289,9 +289,9 @@ export default function Converter() {
                   <SelectValue placeholder="Format țintă" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="docx">Word (DOCX)</SelectItem>
-                  <SelectItem value="xlsx">Excel (XLSX)</SelectItem>
-                  <SelectItem value="txt">Text (TXT)</SelectItem>
+                  {availableConversions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -302,13 +302,10 @@ export default function Converter() {
           </motion.div>
         )}
 
-        {file && currentOp && (
-          <div className="mt-6 flex justify-center">
-            <Button onClick={handleConvert} disabled={isConverting} className="gap-2 px-8 py-6 text-lg">
-              {isConverting ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
-              {isConverting ? 'Se procesează...' : `Convertește în ${currentOp.outputExt.toUpperCase()}`}
-            </Button>
-          </div>
+        {file && availableConversions.length === 0 && (
+            <div className="mt-6 text-center text-sm text-yellow-600">
+                Conversia pentru acest tip de fișier nu este suportată.
+            </div>
         )}
 
         {file && renderPreview()}

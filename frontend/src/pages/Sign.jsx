@@ -1,173 +1,190 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Upload, PenTool, Loader2, X } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
-import { apiService } from '@/lib/api';
+import { motion } from 'framer-motion';
 import { Document, Page, pdfjs } from 'react-pdf';
-// Folosește CDN-ul oficial care suportă CORS
+import SignatureCanvas from 'react-signature-canvas';
+import Draggable from 'react-draggable';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { UploadCloud, FileText, Edit, Trash2, Save, MousePointerClick } from 'lucide-react';
+import apiService from '../lib/api';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
-export default function Sign() {
+const SignPage = () => {
   const [file, setFile] = useState(null);
   const [fileUrl, setFileUrl] = useState(null);
-  const [signatureImage, setSignatureImage] = useState(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [isPlacing, setIsPlacing] = useState(false);
-  const [position, setPosition] = useState({ x: 100, y: 100 });
   const [numPages, setNumPages] = useState(null);
-  const [isSigning, setIsSigning] = useState(false);
-  const canvasRef = useRef(null);
-  const pdfContainerRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [signature, setSignature] = useState(null);
+  const [isSignaturePlaced, setIsSignaturePlaced] = useState(false);
+  const [sigPosition, setSigPosition] = useState({ x: 0, y: 0 });
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const sigCanvas = useRef({});
+  const pdfPageRef = useRef(null);
 
-  useEffect(() => {
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setFileUrl(url);
-      return () => URL.revokeObjectURL(url);
+  const onDrop = useCallback((acceptedFiles) => {
+    if (acceptedFiles.length > 0) {
+      const selectedFile = acceptedFiles[0];
+      setFile(selectedFile);
+      setFileUrl(URL.createObjectURL(selectedFile));
+      setCurrentPage(1);
+      setSignature(null);
+      setIsSignaturePlaced(false);
     }
-  }, [file]);
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'application/pdf': ['.pdf'] }, multiple: false });
 
   const onDocumentLoadSuccess = ({ numPages }) => setNumPages(numPages);
+  const clearSignature = () => sigCanvas.current.clear();
 
-  const startDraw = (e) => {
-    setIsDrawing(true);
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-    const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
-
-  const draw = (e) => {
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
-    const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
-
-  const stopDraw = () => setIsDrawing(false);
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setSignatureImage(null);
-  };
   const saveSignature = () => {
-    const canvas = canvasRef.current;
-    canvas.toBlob((blob) => {
-      setSignatureImage(blob);
-      toast.success('Semnătură salvată!');
-    }, 'image/png');
+    if (sigCanvas.current.isEmpty()) {
+      toast.error("Vă rugăm să desenați o semnătură.");
+      return;
+    }
+    const dataUrl = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
+    setSignature(dataUrl);
+    // NU mai setăm isSignaturePlaced aici. Așteptăm ca utilizatorul să o miște.
+    toast.success("Semnătură creată. Acum trageți-o pe document pentru a o plasa.");
   };
 
-  const handlePdfClick = (e) => {
-    if (!isPlacing) return;
-    const rect = pdfContainerRef.current?.getBoundingClientRect();
-    if (rect) {
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setPosition({ x, y });
-      setIsPlacing(false);
-      toast.success(`Poziție selectată: (${Math.round(x)}, ${Math.round(y)})`);
+  const handleDragStop = (e, data) => {
+    setSigPosition({ x: data.x, y: data.y });
+    if (!isSignaturePlaced) {
+      setIsSignaturePlaced(true); // Semnătura a fost plasată de utilizator
     }
   };
 
   const handleApplySignature = async () => {
-    if (!file || !signatureImage) {
-      toast.error('Încarcă un PDF și desenează o semnătură.');
+    if (!file || !signature) {
+      toast.error("Încărcați un PDF și creați o semnătură mai întâi.");
       return;
     }
-    setIsSigning(true);
+
+    const pageElement = pdfPageRef.current;
+    if (!pageElement) {
+        toast.error("Eroare: Nu s-a putut obține referința paginii PDF.");
+        return;
+    }
+
+    // Calculează coordonatele relative la pagina PDF
+    const pageRect = pageElement.getBoundingClientRect();
+    const finalX = sigPosition.x;
+    const finalY = sigPosition.y;
+
+    // Validare coordonate
+    if (finalX < 0 || finalY < 0 || finalX > pageRect.width || finalY > pageRect.height) {
+        toast.warning("Semnătura pare să fie în afara paginii. Vă rugăm să o repoziționați.");
+        return;
+    }
+
+    setIsLoading(true);
     try {
-      const pdfBlob = await apiService.addSignature(file, signatureImage, position.x, position.y, 1);
-      const url = URL.createObjectURL(pdfBlob);
+      const signatureBlob = await (await fetch(signature)).blob();
+      const signedPdfBlob = await apiService.stirlingSign(file, signatureBlob, String(currentPage), Math.round(finalX), Math.round(finalY));
+      
+      const url = URL.createObjectURL(signedPdfBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `signed_${file.name}`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success('PDF semnat cu succes!');
-    } catch (error) {
-      toast.error(error.message);
+
+      toast.success("PDF semnat și descărcat cu succes!");
+      
+      // Reset state
+      setFile(null);
+      setFileUrl(null);
+      setSignature(null);
+      setIsSignaturePlaced(false);
+
+    } catch (err) {
+      console.error("Eroare la semnare:", err);
+      toast.error(err.message || "A apărut o eroare la semnarea documentului.");
     } finally {
-      setIsSigning(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Semnătură Electronică</h1>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-4">1. Încarcă PDF</h2>
-            {!file ? (
-              <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer">
-                <Upload className="w-8 h-8 mx-auto mb-2" />
-                <p className="text-sm">Click pentru a încărca PDF</p>
-                <input ref={fileInputRef} type="file" accept=".pdf" hidden onChange={(e) => setFile(e.target.files[0])} />
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="container mx-auto p-4 md:p-8">
+      <h1 className="text-3xl font-bold mb-6 text-center">Semnează Documente PDF</h1>
+      <p className="text-muted-foreground text-center mb-8">Desenați o semnătură, plasați-o pe document prin tragere și apoi salvați PDF-ul.</p>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-1 space-y-8">
+          <Card className="glass-card">
+            <CardHeader><CardTitle>1. Încărcați PDF-ul</CardTitle></CardHeader>
+            <CardContent>
+              <div {...getRootProps()} className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer ${isDragActive ? 'border-primary' : 'border-border'}`}>
+                <input {...getInputProps()} />
+                <UploadCloud className="mx-auto h-10 w-10 text-muted-foreground" />
+                <p className="mt-2">Trageți fișierul aici sau faceți clic.</p>
               </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-medium truncate">{file.name}</span>
-                  <button onClick={() => setFile(null)}><X className="w-4 h-4" /></button>
-                </div>
-                <div ref={pdfContainerRef} className="border rounded-lg p-2 overflow-auto" onClick={handlePdfClick} style={{ cursor: isPlacing ? 'crosshair' : 'default' }}>
-                  <Document file={fileUrl} onLoadSuccess={onDocumentLoadSuccess}>
-                    <Page pageNumber={1} width={400} />
-                  </Document>
-                </div>
-                <div className="mt-4 flex justify-between items-center">
-                  <Button variant={isPlacing ? "default" : "outline"} size="sm" onClick={() => setIsPlacing(!isPlacing)}>
-                    {isPlacing ? "Plasează..." : "Selectează poziția"}
-                  </Button>
-                  <span className="text-xs text-muted-foreground">Poziție: ({Math.round(position.x)}, {Math.round(position.y)})</span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-4">2. Desenează semnătura</h2>
-            <canvas
-              ref={canvasRef}
-              width={500}
-              height={200}
-              className="w-full border rounded-lg bg-white cursor-crosshair"
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={stopDraw}
-              onMouseLeave={stopDraw}
-              onTouchStart={startDraw}
-              onTouchMove={draw}
-              onTouchEnd={stopDraw}
-            />
-            <div className="flex gap-2 mt-4">
-              <Button variant="outline" onClick={clearCanvas}>Șterge</Button>
-              <Button onClick={saveSignature}>Salvează semnătura</Button>
-            </div>
-            {signatureImage && <p className="text-xs text-green-600 mt-2">✅ Semnătură salvată</p>}
-          </CardContent>
-        </Card>
-      </div>
-      {file && signatureImage && (
-        <div className="mt-8 text-center">
-          <Button onClick={handleApplySignature} disabled={isSigning} className="gap-2">
-            {isSigning ? <Loader2 className="animate-spin" /> : <PenTool />}
-            Aplică semnătura și descarcă PDF
-          </Button>
+              {file && <div className="mt-4 flex items-center"><FileText className="h-5 w-5 mr-2" /><span>{file.name}</span></div>}
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card">
+            <CardHeader><CardTitle>2. Creați Semnătura</CardTitle></CardHeader>
+            <CardContent>
+              <div className="border rounded-lg bg-white w-full overflow-hidden">
+                <SignatureCanvas ref={sigCanvas} penColor='black' canvasProps={{ className: 'sigCanvas w-full h-auto' }} />
+              </div>
+              <div className="flex justify-between mt-4">
+                <Button variant="outline" onClick={clearSignature}><Trash2 className="mr-2 h-4 w-4"/>Șterge</Button>
+                <Button onClick={saveSignature}><Edit className="mr-2 h-4 w-4"/>Creează</Button>
+              </div>
+            </CardContent>
+          </Card>
+           <Button onClick={handleApplySignature} disabled={!file || !signature || !isSignaturePlaced || isLoading} className="w-full">
+              <Save className="mr-2 h-4 w-4" />
+              {isLoading ? 'Se procesează...' : 'Aplică Semnătura și Descarcă'}
+            </Button>
         </div>
-      )}
-    </div>
+
+        <div className="lg:col-span-2">
+          <Card className="glass-card h-full">
+            <CardHeader><CardTitle>3. Previzualizare și Plasare</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4 flex items-center"><MousePointerClick className="h-4 w-4 mr-2"/>Trageți semnătura pentru a o repoziționa pe pagină.</p>
+              <div ref={pdfPageRef} className="pdf-container relative border rounded-lg overflow-auto bg-gray-200" style={{height: '70vh'}}>
+                {fileUrl ? (
+                  <>
+                    <Document file={fileUrl} onLoadSuccess={onDocumentLoadSuccess} loading="Se încarcă PDF-ul...">
+                      <Page pageNumber={currentPage} renderTextLayer={false} renderAnnotationLayer={false} />
+                    </Document>
+                    {signature && isSignaturePlaced && (
+                      <Draggable bounds="parent" onStop={handleDragStop} position={sigPosition}>
+                        <img src={signature} alt="Signature" className="absolute top-0 left-0 cursor-move" style={{ width: '150px', border: '1px dashed #000' }}/>
+                      </Draggable>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground"><p>Previzualizarea PDF va apărea aici.</p></div>
+                )}
+              </div>
+              {numPages && (
+                <div className="flex justify-center items-center mt-4 space-x-2">
+                  <Button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}>Anterior</Button>
+                  <span>Pagina {currentPage} din {numPages}</span>
+                  <Button onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} disabled={currentPage >= numPages}>Următor</Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </motion.div>
   );
-}
+};
+
+export default SignPage;

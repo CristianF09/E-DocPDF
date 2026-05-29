@@ -40,6 +40,24 @@ class ApiService {
     return response.json();
   }
 
+  async aiAnalyze(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${this.baseURL}/api/v1/ai/analyze`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Analiza documentului a eșuat');
+    }
+
+    return response.json();
+  }
+
   // ========== Autentificare ==========
   async login(username, password) {
     const formData = new URLSearchParams();
@@ -105,6 +123,109 @@ class ApiService {
     return response.blob();
   }
 
+  async aiSummarize(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${this.baseURL}/api/v1/ai/summarize`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Generarea rezumatului a eșuat');
+    }
+
+    return response.json();
+  }
+
+  async stirlingAddWatermark(file, options) {
+    const formData = new FormData();
+    formData.append('fileInput', file);
+    formData.append('watermark_type', options.type);
+
+    if (options.type === 'text') {
+      formData.append('text', options.text);
+    } else if (options.type === 'image' && options.imageFile) {
+      formData.append('imageFile', options.imageFile);
+    }
+
+    const response = await fetch(`${this.baseURL}/api/v1/stirling/watermark`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Adăugarea watermark-ului a eșuat');
+    }
+    return response.blob();
+  }
+
+  async stirlingOcr(file, lang = 'ron', outputType = 'text') {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('lang', lang);
+    formData.append('ocr_output_type', outputType);
+
+    const response = await fetch(`${this.baseURL}/api/v1/stirling/ocr`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Procesul OCR a eșuat');
+    }
+
+    if (outputType === 'text') {
+      return response.text(); // Returnează textul extras
+    }
+    return response.blob(); // Returnează PDF-ul procesat
+  }
+
+  async stirlingSign(file, signatureImageBlob, pageNumbers, x, y) {
+    const formData = new FormData();
+    formData.append('fileInput', file);
+    formData.append('signatureImage', signatureImageBlob, 'signature.png');
+    formData.append('page_numbers', pageNumbers);
+    formData.append('x', x);
+    formData.append('y', y);
+
+    const response = await fetch(`${this.baseURL}/api/v1/stirling/sign`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Aplicarea semnăturii a eșuat');
+    }
+    return response.blob();
+  }
+
+  async stirlingCompress(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${this.baseURL}/api/v1/stirling/compress`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Comprimarea a eșuat');
+    }
+    return response.blob();
+  }
+
   async splitPDF(file, pageRanges) {
     const formData = new FormData();
     formData.append('file', file);
@@ -142,27 +263,22 @@ class ApiService {
     return response.blob();
   }
 
-  async convertToWord(file) {
+  // ========== Conversii Stirling PDF (Endpoint Unificat) ==========
+  async stirlingConvert(file, outputFormat) {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await fetch(`${this.baseURL}/convert/to-word`, {
-      method: 'POST',
-      headers: this._getAuthHeaders(),
-      body: formData
-    });
-    if (!response.ok) throw new Error('Conversia PDF->Word a eșuat');
-    return response.blob();
-  }
+    formData.append('output_format', outputFormat);
 
-  async convertToExcel(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch(`${this.baseURL}/convert/to-excel`, {
+    const response = await fetch(`${this.baseURL}/api/v1/stirling/convert`, {
       method: 'POST',
       headers: this._getAuthHeaders(),
       body: formData
     });
-    if (!response.ok) throw new Error('Conversia PDF->Excel a eșuat');
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `Conversia în ${outputFormat.toUpperCase()} a eșuat`);
+    }
     return response.blob();
   }
 

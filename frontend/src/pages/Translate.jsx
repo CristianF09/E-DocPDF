@@ -7,12 +7,10 @@ import { Upload, Image as ImageIcon, Loader2, Languages, Download, Copy, Check, 
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/TextLayer.css';
 import { apiService } from '@/lib/api';
 // Configurare PDF.js worker local (fără CORS)
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url,
-).toString();
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const languageOptions = [
   { value: 'eng', label: 'English' },
