@@ -58,7 +58,7 @@ export default function HeroSection() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="flex items-center justify-center mb-20"
         >
-          <Link to="/dashboard">
+          <Link to="/tools">
             <div className="animated-border">
               <Button size="lg" className="bg-background hover:bg-background/90 text-foreground px-14 h-14 text-base font-semibold gap-2 rounded-[calc(var(--radius)+1px)]">
                 Începe Gratuit

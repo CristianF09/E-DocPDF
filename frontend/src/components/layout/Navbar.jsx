@@ -20,7 +20,7 @@ const Navbar = () => {
     { label: 'Acasă', href: '/' },
     { label: 'Tool-uri', href: '/tools' },
     { label: 'Prețuri', href: '/pricing' },
-    { label: 'Despre noi', href: '/#about' },
+
   ];
 
   if (isDashboard) return null;

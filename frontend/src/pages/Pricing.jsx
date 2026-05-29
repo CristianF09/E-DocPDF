@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Check, X, Crown, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
+
 
 const plans = [
   {
@@ -182,7 +182,7 @@ export default function Pricing() {
       <div className="min-h-screen bg-background">
         <Navbar />
         {content}
-        <Footer />
+
       </div>
     );
   }

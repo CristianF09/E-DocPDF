@@ -17,8 +17,10 @@ import MyDocuments from './pages/MyDocuments';
 import Converter from './pages/Converter';
 import Translate from './pages/Translate';
 import Tools from './pages/Tools';
+import AboutPage from './pages/About';
 import Pricing from './pages/Pricing';
 import Settings from './pages/Settings';
+import Contact from './pages/Contact';
 import Login from './pages/Login';
 
 const Layout = ({ children }) => (
@@ -66,6 +68,7 @@ const AuthenticatedApp = () => {
       <Route path="/sign" element={<Layout><Sign /></Layout>} />
       <Route path="/tools" element={<Layout><Tools /></Layout>} />
       <Route path="/settings" element={<Layout><Settings /></Layout>} />
+      <Route path="/contact" element={<Layout><Contact /></Layout>} />
       <Route path="/tools/compress" element={<Layout><Converter /></Layout>} />
       <Route path="/tools/merge" element={<Layout><Converter /></Layout>} />
       <Route path="/tools/split" element={<Layout><Converter /></Layout>} />
@@ -73,6 +76,7 @@ const AuthenticatedApp = () => {
       <Route path="/tools/watermark" element={<Layout><Converter /></Layout>} />
       <Route path="/tools/protect" element={<Layout><Converter /></Layout>} />
       <Route path="/tools/unlock" element={<Layout><Converter /></Layout>} />
+      <Route path="/about" element={<Layout><AboutPage /></Layout>} />
       <Route path="/tools/ai-edit" element={<Layout><Converter /></Layout>} />
       <Route path="*" element={<Layout><PageNotFound /></Layout>} />
     </Routes>
@@ -90,9 +94,7 @@ function App() {
       </QueryClientProvider>
     </AuthProvider>
   );
-  <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-    <AuthenticatedApp />
-  </Router>
+
 }
 
 export default App;

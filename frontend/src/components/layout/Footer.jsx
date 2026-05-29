@@ -13,7 +13,7 @@ export default function Footer() {
                 <FileText className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold font-space">
-                File<span className="gradient-text">Fusion</span>
+                E-<span className="gradient-text">DocPDF</span>
               </span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -36,8 +36,6 @@ export default function Footer() {
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li><Link to="/about" className="hover:text-foreground transition-colors hover:pl-1 duration-300">Despre Noi</Link></li>
               <li><Link to="/pricing" className="hover:text-foreground transition-colors hover:pl-1 duration-300">Prețuri</Link></li>
-              <li><a href="#" className="hover:text-foreground transition-colors hover:pl-1 duration-300">Contact</a></li>
-              <li><a href="#" className="hover:text-foreground transition-colors hover:pl-1 duration-300">Blog</a></li>
             </ul>
           </div>
 
@@ -54,7 +52,7 @@ export default function Footer() {
 
         <div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            © 2026 FileFusion. Toate drepturile rezervate.
+            © 2026 E-DocPDF. Toate drepturile rezervate.
           </p>
           <p className="text-xs text-muted-foreground">
             Conform legislației UE/RO privind semnăturile electronice
