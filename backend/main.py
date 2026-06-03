@@ -21,6 +21,11 @@ import json
 from dotenv import load_dotenv
 import base64
 import httpx
+from io import BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_JUSTIFY
 
 # Încarcă variabilele de mediu
 load_dotenv()
@@ -56,6 +61,21 @@ if TEMPLATES_FILE.exists():
 else:
     LEGAL_TEMPLATES = {}
     print("⚠️ legal_templates.json not found in templates/ directory")
+
+# ========== Import local helper modules (fallbacks) ==========
+try:
+    # app package is backend/app
+    import app.convert as local_convert
+    import app.ocr as local_ocr
+    import app.sign as local_sign
+    import app.translate as local_translate
+    print("✅ Local helpers (convert/ocr/sign/translate) loaded")
+except Exception as e:
+    local_convert = None
+    local_ocr = None
+    local_sign = None
+    local_translate = None
+    print("⚠️ Local helper modules not available:", e)
 
 # Configurare securitate
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-keep-it-safe-2024")
@@ -120,6 +140,10 @@ class TranslationRequest(BaseModel):
     text: Optional[str] = None
     file: Optional[str] = None
 
+class OpenRouterRequest(BaseModel):
+    prompt: str
+    model: Optional[str] = None
+
 # ========== Date utilizatori test ==========
 fake_users_db = {}
 documents_db = []
@@ -161,83 +185,57 @@ def check_stirling_health():
     except:
         return False
 
-async def create_pdf_from_text_stirling(content: str, filename: str) -> bytes:
-    """Creează un PDF dintr-un text folosind Stirling PDF (via HTML)."""
-    if not check_stirling_health():
-        raise HTTPException(status_code=503, detail="Stirling PDF service is not available")
-
-    # Transformă textul simplu în HTML, păstrând formatarea de bază
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="ro">
-    <head>
-        <meta charset="UTF-8">
-        <title>{filename}</title>
-        <style>
-            body {{ font-family: sans-serif; line-height: 1.6; }}
-            pre {{ white-space: pre-wrap; font-family: sans-serif; }}
-        </style>
-    </head>
-    <body>
-        <pre>{content}</pre>
-    </body>
-    </html>
-    """
-
-    full_stirling_url = f"{STIRLING_URL}/convert/html/pdf"
-    # Stirling se așteaptă la un fișier, deci trimitem HTML-ul ca un fișier
-    files = {'fileInput': (f"{filename}.html", html_content.encode('utf-8'), 'text/html')}
-
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        try:
-            response = await client.post(full_stirling_url, files=files)
-            response.raise_for_status()
-            return response.content
-        except httpx.RequestError as exc:
-            raise HTTPException(status_code=503, detail=f"Eroare la crearea PDF-ului via Stirling: {exc}")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"O eroare neașteptată a apărut la crearea PDF-ului: {e}")
-
-def create_pdf_from_text(content: str, filename: str):
-    """Genereaza un PDF simplu din text folosind ReportLab."""
-    from io import BytesIO
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib.units import mm
-    from xml.sax.saxutils import escape
-
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
+def create_pdf_from_text(content: str, filename : str) -> BytesIO:
+    """Creează un PDF conform cu diacritice și așezare automată în pagină (Word-like)"""
+    buffer  = BytesIO()
+    
+    # Setare document cu margini standard de 2 cm
+    doc  = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=20 * mm,
-        leftMargin=20 * mm,
-        topMargin=20 * mm,
-        bottomMargin=20 * mm,
-        title=filename,
+        rightMargin=54, leftMargin=54, topMargin=54, bottomMargin=54
     )
-    styles = getSampleStyleSheet()
-    normal = styles["Normal"]
-    normal.fontName = "Helvetica"
-    normal.fontSize = 10
-    normal.leading = 14
-
-    story = []
-    for line in content.splitlines():
-        story.append(Paragraph(escape(line) if line.strip() else "&nbsp;", normal))
-        story.append(Spacer(1, 4))
-
+    
+    styles  = getSampleStyleSheet()
+    
+    # Stil personalizat pentru textul legislativ din România
+    romanian_legal_style  = ParagraphStyle(
+        'RomanianLegal' ,
+        parent=styles['Normal' ],
+        fontName='Helvetica' ,
+        fontSize=11 ,
+        leading=16, # Spațiere rânduri standard
+        alignment=TA_JUSTIFY,
+        spaceAfter=12
+    )
+    
+    story  = []
+    
+    # Separăm textul în paragrafe pe baza liniei noi și le adăugăm în structura PDF
+    paragraphs = content.split('\n' )
+    for p_text in  paragraphs:
+        if p_text.strip() == "" :
+            story.append(Spacer(1, 10 ))
+        else :
+            # Înlocuim newline-urile simple cu taguri compatibile ReportLab
+            clean_text = p_text.replace('\n', '<br/>' )
+            story.append(Paragraph(clean_text, romanian_legal_style))
+            
     doc.build(story)
-    buffer.seek(0)
+    buffer.seek(0 )
     return buffer
 
-@app.post("/legal/generate-stirling-legacy", summary="Generează un document legal dintr-un template via Stirling")
-async def generate_legal_document_stirling_legacy(request: LegalDocumentRequest, current_user: User = Depends(get_current_user)):
+@app.get("/legal/templates", summary="Obține lista de template-uri legale")
+async def get_legal_templates():
+    return LEGAL_TEMPLATES
+
+@app.post("/legal/generate", summary="Generează un document legal dintr-un template")
+async def generate_legal_document(request: LegalDocumentRequest):
     """
     Generează un document (PDF sau text) pe baza unui template și a variabilelor furnizate.
     """
-    template = LEGAL_TEMPLATES.get(request.template_id)
+    # Caută template-ul în lista încărcată
+    template = next((t for t in LEGAL_TEMPLATES if t['id'] == request.template_id), None)
     if not template:
         raise HTTPException(status_code=404, detail="Template-ul legal nu a fost găsit.")
 
@@ -256,19 +254,18 @@ async def generate_legal_document_stirling_legacy(request: LegalDocumentRequest,
             detail=f"Variabile lipsă în cerere: {', '.join(remaining_vars)}"
         )
 
+    # Optional: oferă o versiune poleită cu AI (dacă este disponibilă)
+    # Acest endpoint produce documentul final. Dacă se dorește poleire AI, folosiți /legal/generate/ai
     if request.format == "pdf":
         try:
-            pdf_content = await create_pdf_from_text_stirling(content, f"{request.template_id}.pdf")
+            pdf_buffer = create_pdf_from_text(content, f"{request.template_id}.pdf")
             return Response(
-                content=pdf_content,
+                content=pdf_buffer.getvalue(),
                 media_type="application/pdf",
                 headers={"Content-Disposition": f"attachment; filename={request.template_id}.pdf"}
             )
-        except HTTPException as e:
-            # Propagă excepțiile de la funcția de creare PDF
-            raise e
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"A apărut o eroare la generarea PDF-ului: {e}")
+            raise HTTPException(status_code=500, detail=f"A apărut o eroare la generarea PDF-ului: {str(e)}")
     
     elif request.format == "txt":
         return Response(
@@ -279,6 +276,64 @@ async def generate_legal_document_stirling_legacy(request: LegalDocumentRequest,
     
     else:
         raise HTTPException(status_code=400, detail="Formatul de ieșire trebuie să fie 'pdf' sau 'txt'.")
+
+
+# ========= AI-Enhanced generation (parsing + polish) =========
+@app.post("/legal/generate/ai", summary="Generează și polește documentul legal cu AI (dacă este disponibil)")
+async def generate_legal_document_ai(request: LegalDocumentRequest, polish_with_ai: bool = Form(False)):
+    """
+    Generează un document din template și (opțional) îl polește cu AI pentru limbaj formal/legal.
+    Folosește Google Gemini dacă este configurat; altfel încearcă un fallback local de paraphrase (dacă există).
+    """
+    template = next((t for t in LEGAL_TEMPLATES if t['id'] == request.template_id), None)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template-ul legal nu a fost găsit.")
+
+    content = template["content"]
+    for key, value in request.variables.items():
+        placeholder = f"{{{{{key}}}}}"
+        content = content.replace(placeholder, value)
+
+    # Basic placeholder check
+    if "{{" in content and "}}" in content:
+        import re
+        remaining = re.findall(r"\{\{([^}]+)\}\}", content)
+        raise HTTPException(status_code=400, detail=f"Variabile lipsă: {', '.join(remaining)}")
+
+    polished = content
+
+    if polish_with_ai:
+        # Prefer cloud AI client
+        if AI_AVAILABLE and client:
+            prompt = (
+                "You are an expert legal writer. Polish and formalize the following Romanian legal document. "
+                "Keep legal meaning unchanged, improve clarity, grammar, and formal tone. Return the full document only.\n\n" + content
+            )
+            try:
+                resp = client.generate_content(model="models/gemini-1.5-flash", contents=[prompt])
+                polished = resp.text
+            except Exception as e:
+                # continue to local fallback
+                polished = content
+        else:
+            # Local fallback: try to paraphrase using transformers (if available)
+            try:
+                from transformers import pipeline
+                paraphraser = pipeline('text2text-generation', model='google/flan-t5-small')
+                # May need to chunk; keep it simple for now
+                out = paraphraser("Polish this Romanian legal document:\n" + content, max_length=2000)
+                polished = out[0]['generated_text'] if isinstance(out, list) else str(out)
+            except Exception:
+                polished = content
+
+    if request.format == 'pdf':
+        try:
+            pdf_buffer = create_pdf_from_text(polished, f"{request.template_id}_ai.pdf")
+            return Response(content=pdf_buffer.getvalue(), media_type='application/pdf', headers={"Content-Disposition": f"attachment; filename={request.template_id}_ai.pdf"})
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return Response(content=polished, media_type='text/plain', headers={"Content-Disposition": f"attachment; filename={request.template_id}_ai.txt"})
 
 # ========== Endpoint-uri ==========
 @app.get("/")
@@ -459,60 +514,78 @@ async def stirling_convert_unified(
     """
     Endpoint unificat pentru a converti fișiere folosind Stirling PDF.
     Determină automat endpoint-ul necesar pe baza extensiilor.
+    Folosește Stirling când este disponibil; altfel folosește fallback local (unde există).
     """
-    if not check_stirling_health():
-        raise HTTPException(status_code=503, detail="Stirling PDF service is not available")
-
     input_format = file.filename.split('.')[-1].lower()
-    
-    # Construiește calea pentru API-ul Stirling
-    # Exemplu: /convert/pdf/docx
-    stirling_api_path = f"/convert/{input_format}/{output_format}"
-    full_stirling_url = f"{STIRLING_URL}{stirling_api_path}"
 
-    content = await file.read()
-    files = {'fileInput': (file.filename, content, file.content_type)}
+    # If Stirling available, prefer it
+    if check_stirling_health():
+        stirling_api_path = f"/convert/{input_format}/{output_format}"
+        full_stirling_url = f"{STIRLING_URL}{stirling_api_path}"
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            response = await client.post(full_stirling_url, files=files)
-            
-            if response.status_code == 404:
-                 raise HTTPException(
-                    status_code=400, 
-                    detail=f"Conversia de la '{input_format}' la '{output_format}' nu este suportată de Stirling PDF."
+        content = await file.read()
+        files = {'fileInput': (file.filename, content, file.content_type)}
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            try:
+                response = await client.post(full_stirling_url, files=files)
+                
+                if response.status_code == 404:
+                     raise HTTPException(
+                        status_code=400, 
+                        detail=f"Conversia de la '{input_format}' la '{output_format}' nu este suportată de Stirling PDF."
+                    )
+
+                response.raise_for_status()
+
+                media_type_map = {
+                    "pdf": "application/pdf",
+                    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    "jpg": "image/jpeg",
+                    "png": "image/png",
+                    "txt": "text/plain",
+                    "html": "text/html",
+                }
+
+                media_type = media_type_map.get(output_format, "application/octet-stream")
+                new_filename = f"{file.filename.rsplit('.', 1)[0]}.{output_format}"
+
+                return Response(
+                    content=response.content,
+                    media_type=media_type,
+                    headers={"Content-Disposition": f"attachment; filename={new_filename}"}
                 )
 
-            response.raise_for_status()
+            except httpx.RequestError as exc:
+                raise HTTPException(status_code=503, detail=f"Eroare la contactarea serviciului Stirling PDF: {exc}")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"O eroare neașteptată a apărut: {e}")
 
-            # Determină Content-Type-ul pe baza formatului de ieșire
-            # Puteți extinde această listă
-            media_type_map = {
-                "pdf": "application/pdf",
-                "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                "jpg": "image/jpeg",
-                "png": "image/png",
-                "txt": "text/plain",
-                "html": "text/html",
-            }
-            media_type = media_type_map.get(output_format, "application/octet-stream")
-            
-            new_filename = f"{file.filename.rsplit('.', 1)[0]}.{output_format}"
+    # Fallback to local converters when Stirling is not available
+    if not check_stirling_health():
+        if local_convert is None:
+            raise HTTPException(status_code=503, detail="Serviciul Stirling nu este disponibil și nu există fallback local.")
 
-            return Response(
-                content=response.content,
-                media_type=media_type,
-                headers={"Content-Disposition": f"attachment; filename={new_filename}"}
-            )
+        # Example: PDF -> DOCX local
+        if input_format == 'pdf' and output_format in ['docx', 'doc']:
+            # Save temp file
+            temp_in = BASE_DIR / 'temp_in' / file.filename
+            temp_in.parent.mkdir(parents=True, exist_ok=True)
+            content = await file.read()
+            with open(temp_in, 'wb') as f:
+                f.write(content)
+            temp_out = BASE_DIR / 'temp_out' / (temp_in.stem + '.' + output_format)
+            temp_out.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                local_convert.pdf_to_docx(str(temp_in), str(temp_out))
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Fallback conversion failed: {e}")
+            return FileResponse(str(temp_out), filename=temp_out.name)
 
-        except httpx.RequestError as exc:
-            raise HTTPException(status_code=503, detail=f"Eroare la contactarea serviciului Stirling PDF: {exc}")
-        except Exception as e:
-            # Prinde alte erori neașteptate
-            raise HTTPException(status_code=500, detail=f"O eroare neașteptată a apărut: {e}")
-
+        # Other conversions not implemented locally
+        raise HTTPException(status_code=400, detail=f"Conversia {input_format} -> {output_format} nu este suportată local.")
 
 # ===================== COMPRIMARE PDF =====================
 @app.post("/api/v1/stirling/compress")
@@ -643,6 +716,17 @@ async def ai_analyze_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=error_detail)
 
 
+@app.post("/api/v1/ai/open-router-completion")
+async def open_router_completion(request: OpenRouterRequest):
+    """Obține o completare de la OpenRouter folosind diverse modele AI."""
+    try:
+        # Pasează modelul către funcția de serviciu, dacă este specificat
+        response = get_open_router_completion(prompt=request.prompt, model=request.model)
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/v1/stirling/sign", summary="Adaugă o imagine (semnătură) pe un PDF")
 async def stirling_add_signature(
     pdf_file: UploadFile = File(..., alias="fileInput"),
@@ -656,9 +740,27 @@ async def stirling_add_signature(
     Aplică o imagine (semnătură) pe o anumită pagină a unui document PDF
     folosind endpoint-ul /add-image de la Stirling PDF.
     """
+    # If Stirling is down, attempt local stamping
     if not check_stirling_health():
-        raise HTTPException(status_code=503, detail="Stirling PDF service is not available")
+        if local_sign is None:
+            raise HTTPException(status_code=503, detail="Stirling PDF service is not available and no local signing backend present")
 
+        # Save files locally and use PyMuPDF stamping
+        temp_pdf = UPLOAD_DIR / pdf_file.filename
+        temp_sig = UPLOAD_DIR / ('sig_' + signature_file.filename)
+        with open(temp_pdf, 'wb') as f:
+            f.write(await pdf_file.read())
+        with open(temp_sig, 'wb') as f:
+            f.write(await signature_file.read())
+
+        output_path = OUTPUT_DIR / (temp_pdf.stem + '_signed.pdf')
+        try:
+            local_sign.stamp_signature(str(temp_pdf), str(temp_sig), str(output_path), page=page_number, x=x_position, y=y_position)
+            return FileResponse(str(output_path), filename=output_path.name)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Local signing failed: {e}")
+
+    # Otherwise use Stirling
     full_stirling_url = f"{STIRLING_URL}/add-image"
     
     pdf_content = await pdf_file.read()
@@ -797,10 +899,30 @@ async def stirling_ocr(
     lang: str = Form("ron"),  # Limba implicită este româna
     ocr_output_type: str = Form("text") # Poate fi 'text' sau 'pdf'
 ):
-    """Rulează OCR pe un fișier folosind Stirling PDF."""
+    """Rulează OCR pe un fișier folosind Stirling PDF.
+    Dacă Stirling nu este disponibil, încearcă fallback local (pdf2image + pytesseract).
+    """
+    # If Stirling down, try local
     if not check_stirling_health():
-        raise HTTPException(status_code=503, detail="Stirling PDF service is not available")
+        if local_ocr is None:
+            raise HTTPException(status_code=503, detail="Stirling PDF service is not available and no local OCR backend present")
 
+        # Save temp
+        temp_pdf = UPLOAD_DIR / file.filename
+        with open(temp_pdf, 'wb') as f:
+            f.write(await file.read())
+
+        try:
+            text = local_ocr.perform_ocr(str(temp_pdf), lang=lang)
+            if ocr_output_type == 'text':
+                return Response(content=text, media_type='text/plain')
+            else:
+                # For PDF output, simply return the original file (no OCRed PDF generation implemented locally)
+                return FileResponse(str(temp_pdf), filename=temp_pdf.name)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Local OCR failed: {e}")
+
+    # Otherwise use Stirling
     full_stirling_url = f"{STIRLING_URL}/ocr"
     content = await file.read()
     files = {'fileInput': (file.filename, content, file.content_type)}
@@ -839,9 +961,20 @@ async def ocr_extract_text(
     current_user: User = Depends(get_current_user)
 ):
     """Extrage text dintr-un PDF scanat folosind OCR"""
+    # Prefer Stirling; if down, try local OCR
     if not check_stirling_health():
-        raise HTTPException(status_code=503, detail="Stirling PDF service is not available")
-    
+        if local_ocr is None:
+            raise HTTPException(status_code=503, detail="Stirling PDF service is not available and no local OCR backend present")
+        # Save and run local OCR
+        temp_pdf = UPLOAD_DIR / file.filename
+        with open(temp_pdf, 'wb') as f:
+            f.write(await file.read())
+        try:
+            text = local_ocr.perform_ocr(str(temp_pdf), lang=language)
+            return {"filename": file.filename, "extracted_text": text, "text_length": len(text), "language": language}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Local OCR failed: {e}")
+
     try:
         content = await file.read()
         files = {'fileInput': (file.filename, content, file.content_type)}
@@ -869,56 +1002,63 @@ async def ocr_and_translate(
     current_user: User = Depends(get_current_user)
 ):
     """Extrage text cu OCR și îl traduce folosind AI"""
-    if not AI_AVAILABLE:
-        raise HTTPException(status_code=503, detail="AI service not configured")
-    if not check_stirling_health():
-        raise HTTPException(status_code=503, detail="Stirling PDF service not available")
-    
-    try:
-        # Pas 1: Extrage text cu OCR
-        content = await file.read()
+    # Pas 1: Extrage text cu OCR — prefer Stirling, fallback local
+    content = await file.read()
+    extracted_text = None
+
+    if check_stirling_health():
         files = {'fileInput': (file.filename, content, file.content_type)}
         ocr_data = {'language': 'ron'}
-        
         ocr_response = requests.post(f"{STIRLING_URL}/ocr/pdf-to-ocr", files=files, data=ocr_data, timeout=120)
-        
         if ocr_response.status_code != 200:
-            raise HTTPException(status_code=ocr_response.status_code, detail="OCR extraction failed")
-        
+            raise HTTPException(status_code=ocr_response.status_code, detail="OCR extraction failed via Stirling")
         extracted_text = ocr_response.text
-        
-        if not extracted_text or len(extracted_text.strip()) < 10:
-            return {
-                "filename": file.filename,
-                "extracted_text": extracted_text,
-                "translated_text": "Nu s-a putut extrage text suficient pentru traducere.",
-                "status": "no_text"
-            }
-        
-        # Pas 2: Tradu cu Gemini
-        prompt = f"""
-        Tradu următorul text din {source_lang} în limba {target_lang}.
-        Păstrează sensul original și formatarea.
-        Textul:
-        {extracted_text[:30000]}
-        """
-        
-        response = ai_client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=[prompt]
-        )
-        translated_text = response.text
-        
+    else:
+        if local_ocr is None:
+            raise HTTPException(status_code=503, detail="Stirling unavailable and no local OCR present")
+        temp_pdf = UPLOAD_DIR / file.filename
+        with open(temp_pdf, 'wb') as f:
+            f.write(content)
+        extracted_text = local_ocr.perform_ocr(str(temp_pdf), lang=source_lang if source_lang != 'auto' else 'ron')
+
+    if not extracted_text or len(extracted_text.strip()) < 10:
         return {
-            "extracted_text": extracted_text[:1000] + "..." if len(extracted_text) > 1000 else extracted_text,
-            "translated_text": translated_text,
             "filename": file.filename,
-            "source_language": source_lang,
-            "target_language": target_lang
+            "extracted_text": extracted_text,
+            "translated_text": "Nu s-a putut extrage text suficient pentru traducere.",
+            "status": "no_text"
         }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OCR/Translation failed: {str(e)}")
+
+    # Pas 2: Tradu — prefer cloud AI if configured, else local_translate if available
+    translated_text = None
+    if AI_AVAILABLE and client is not None:
+        prompt = f"Tradu următorul text din {source_lang} în limba {target_lang}. Păstrează sensul original și formatarea.\n\n{extracted_text[:30000]}"
+        try:
+            response = client.generate_content(model="models/gemini-1.5-flash", contents=[prompt])
+            translated_text = response.text
+        except Exception:
+            translated_text = None
+
+    if translated_text is None:
+        if local_translate is not None:
+            try:
+                try:
+                    # translate_text(text, target_lang='ro', source_lang='auto')
+                    translated_text = local_translate.translate_text(extracted_text, target_lang, source_lang)
+                except Exception:
+                    translated_text = ""
+            except Exception:
+                translated_text = ""
+        else:
+            translated_text = ""
+
+    return {
+        "extracted_text": extracted_text[:1000] + "..." if len(extracted_text) > 1000 else extracted_text,
+        "translated_text": translated_text,
+        "filename": file.filename,
+        "source_language": source_lang,
+        "target_language": target_lang
+    }
 
 # ========== 3. SEMNĂTURI ==========
 @app.post("/signatures/add")
