@@ -54,6 +54,9 @@ else:
 
 # Încarcă template-uri legale
 BASE_DIR = Path(__file__).resolve().parent
+import sys
+# Ensure backend directory is on sys.path so local modules (analytics, app.*) import correctly
+sys.path.insert(0, str(BASE_DIR))
 TEMPLATES_FILE = BASE_DIR / "templates" / "legal_templates.json"
 if TEMPLATES_FILE.exists():
     with open(TEMPLATES_FILE, 'r', encoding='utf-8') as f:
@@ -416,6 +419,58 @@ async def upload_document(file: UploadFile = File(...), current_user: User = Dep
         upload_date=datetime.utcnow(), 
         file_size=len(content)
     )
+    documents_db.append(document.dict())
+    return document
+
+@app.post("/documents/save", response_model=Document, summary="Salvează/actualizează PDF-ul modificat pe server")
+async def save_document(
+    file: UploadFile = File(...),
+    document_id: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user)
+):
+    """Salvează un PDF modificat. Dacă document_id este furnizat, încearcă să actualizeze intrarea existentă; altfel creează una nouă."""
+    upload_dir = Path("uploads")
+    upload_dir.mkdir(exist_ok=True)
+
+    content = await file.read()
+
+    if document_id:
+        # găsește document existent
+        existing = next((d for d in documents_db if d.get("id") == document_id), None)
+        file_ext = os.path.splitext(file.filename)[1] or ".pdf"
+        unique_filename = f"{document_id}{file_ext}"
+        file_path = upload_dir / unique_filename
+
+        # șterge fișiere vechi cu același id
+        for p in upload_dir.glob(f"{document_id}.*"):
+            try:
+                p.unlink()
+            except Exception:
+                pass
+
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+        if existing:
+            existing["filename"] = file.filename
+            existing["upload_date"] = datetime.utcnow()
+            existing["file_size"] = len(content)
+            return Document(**existing)
+        else:
+            # creează nou dacă nu există
+            document = Document(id=document_id, filename=file.filename, upload_date=datetime.utcnow(), file_size=len(content))
+            documents_db.append(document.dict())
+            return document
+
+    # Fără document_id: creează una nouă intrare
+    new_id = str(uuid.uuid4())
+    file_ext = os.path.splitext(file.filename)[1] or ".pdf"
+    unique_filename = f"{new_id}{file_ext}"
+    file_path = upload_dir / unique_filename
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    document = Document(id=new_id, filename=file.filename, upload_date=datetime.utcnow(), file_size=len(content))
     documents_db.append(document.dict())
     return document
 

@@ -1,0 +1,109 @@
+[
+  {
+    "id": "nda-001",
+    "name": "Acord de Confidențialitate (NDA)",
+    "category": "Comercial",
+    "description": "Un acord standard pentru a proteja informațiile confidențiale partajate între două părți.",
+    "placeholders": [
+      { "key": "{{partea_divulgatoare}}", "label": "Numele Părții care Divulgă Informația", "type": "text" },
+      { "key": "{{partea_receptoare}}", "label": "Numele Părții care Primește Informația", "type": "text" },
+      { "key": "{{data_acord}}", "label": "Data Semnării Acordului", "type": "date" },
+      { "key": "{{scopul_divulgarii}}", "label": "Scopul Divulgării Informațiilor", "type": "textarea" }
+    ],
+    "content": "ACORD DE CONFIDENȚIALITATE\n\nÎncheiat astăzi, {{data_acord}},\n\nÎNTRE:\n\n{{partea_divulgatoare}}, denumită în continuare 'Partea Divulgatoare',\n\nȘI\n\n{{partea_receptoare}}, denumită în continuare 'Partea Receptoare'.\n\nArt. 1. Scopul\nAcest acord are ca scop protejarea informațiilor confidențiale partajate pentru următorul scop: {{scopul_divulgarii}}.\n\n..."
+  },
+  {
+    "id": "servicii-001",
+    "name": "Contract de Prestări Servicii",
+    "category": "Servicii",
+    "description": "Un contract de bază pentru furnizarea de servicii de către un prestator unui client.",
+    "placeholders": [
+      { "key": "{{nume_prestator}}", "label": "Numele Prestatorului", "type": "text" },
+      { "key": "{{nume_client}}", "label": "Numele Clientului", "type": "text" },
+      { "key": "{{descriere_servicii}}", "label": "Descrierea Serviciilor", "type": "textarea" },
+      { "key": "{{suma_plata}}", "label": "Suma de Plată (RON)", "type": "number" },
+      { "key": "{{data_inceput}}", "label": "Data de Început a Contractului", "type": "date" },
+      { "key": "{{data_sfarsit}}", "label": "Data de Sfârșit a Contractului", "type": "date" }
+    ],
+    "content": "CONTRACT DE PRESTĂRI SERVICII\n\nÎncheiat între {{nume_prestator}} (Prestator) și {{nume_client}} (Client) la data de {{data_inceput}}.\n\nArt. 1. Obiectul Contractului\nPrestatorul se obligă să furnizeze următoarele servicii: {{descriere_servicii}}.\n\nArt. 2. Prețul și Modalități de Plată\nClientul va plăti Prestatorului suma de {{suma_plata}} RON.\n\nArt. 3. Durata Contractului\nContractul este valabil de la {{data_inceput}} până la {{data_sfarsit}}.\n\n..."
+  },
+  {
+    "id": "proforma-001",
+    "name": "Factură Proformă",
+    "category": "Financiar",
+    "description": "Un model de factură proformă pentru a informa clientul despre costurile estimate ale produselor sau serviciilor.",
+    "placeholders": [
+      { "key": "{{nume_furnizor}}", "label": "Numele Furnizorului", "type": "text" },
+      { "key": "{{adresa_furnizor}}", "label": "Adresa Furnizorului", "type": "text" },
+      { "key": "{{nume_client}}", "label": "Numele Clientului", "type": "text" },
+      { "key": "{{adresa_client}}", "label": "Adresa Clientului", "type": "text" },
+      { "key": "{{numar_proforma}}", "label": "Număr Proformă", "type": "text" },
+      { "key": "{{data_emitere}}", "label": "Data Emiterii", "type": "date" },
+      { "key": "{{lista_produse}}", "label": "Listă Produse/Servicii (format: Nume|Cantitate|Preț Unitar)", "type": "textarea" },
+      { "key": "{{total_plata}}", "label": "Total de Plată (RON)", "type": "number" }
+    ],
+    "content": "FACTURĂ PROFORMĂ\n\nFurnizor: {{nume_furnizor}}\nAdresă: {{adresa_furnizor}}\n\nClient: {{nume_client}}\nAdresă: {{adresa_client}}\n\nNumăr Proformă: {{numar_proforma}}\nData: {{data_emitere}}\n\nDetalii:\n{{lista_produse}}\n\nTotal de Plată: {{total_plata}} RON"
+  },
+  {
+    "id": "banking_esalonare_credit",
+    "name": "Cerere de Eșalonare / Restructurare Credit Bancar",
+    "category": "Banking",
+    "description": "Solicitare oficială adresată instituțiilor bancare pentru modificarea graficului de rambursare conform normelor BNR.",
+    "placeholders": [
+        { "key": "{{banca}}", "label": "Numele Băncii (Ex: BCR, Banca Transilvania)", "type": "text" },
+        { "key": "{{titular}}", "label": "Nume Prenume Client", "type": "text" },
+        { "key": "{{cnp}}", "label": "CNP Titular", "type": "text" },
+        { "key": "{{contract_numar}}", "label": "Număr Contract de Credit", "type": "text" },
+        { "key": "{{data_contract}}", "label": "Data Contract (DD.MM.YYYY)", "type": "date" },
+        { "key": "{{motiv_solicitare}}", "label": "Descriere scurtă (Ex: Diminuarea temporară a veniturilor)", "type": "textarea" },
+        { "key": "{{perioada_dorita}}", "label": "Număr luni (Ex: 6 luni)", "type": "text" }
+    ],
+    "content": "Către: {{banca}}\n\nSubsemnatul {{titular}}, identificat cu CNP {{cnp}}, în calitate de împrumutat în baza Contractului de Credit nr. {{contract_numar}} din data de {{data_contract}}, vă rog prin prezenta să îmi aprobați o restructurare / eșalonare a obligațiilor de plată.\n\nSolicit această măsură din următoarele considerente: {{motiv_solicitare}}.\nDoresc, dacă este posibil, o perioadă de grație sau o reeșalonare pe o perioadă de {{perioada_dorita}}.\n\nData: ______________\nSemnătura Client: ______________"
+  },
+  {
+    "id": "gov_petitie_standard",
+    "name": "Petiție / Reclamație Oficială (O.G. nr. 27/2002)",
+    "category": "Government",
+    "description": "Formular de petiție standard conform ordonanței privind dreptul de a adresa petiții autorităților publice.",
+    "placeholders": [
+        { "key": "{{autoritate}}", "label": "Ex: Primăria Sector 4, ANPC, Poliția Română", "type": "text" },
+        { "key": "{{petent}}", "label": "Nume Prenume Reclamant", "type": "text" },
+        { "key": "{{domiciliu}}", "label": "Adresă completă de corespondență", "type": "text" },
+        { "key": "{{obiect_petitie}}", "label": "Descrierea clară a problemei sau abuzului reclamat", "type": "textarea" },
+        { "key": "{{solicitare}}", "label": "Ce doriți să întreprindă instituția publică", "type": "textarea" }
+    ],
+    "content": "Către: {{autoritate}}\n\nSubsemnatul {{petent}}, cu domiciliul în {{domiciliu}}, formulez prezenta PETIȚIE în conformitate cu prevederile Ordonanței Guvernului nr. 27/2002.\n\nPrin prezenta, vă aduc la cunoștință următoarele aspecte: {{obiect_petitie}}.\nFață de cele prezentate, vă solicit: {{solicitare}}.\n\nAștept răspunsul dumneavoastră în termenul legal de 30 de zile la adresa de corespondență indicată.\n\nData: ______________\nSemnătura: ______________"
+  },
+  {
+    "id": "employer_decizie_incetare",
+    "name": "Decizie Încetare Contract Muncă (Art. 55 lit. b)",
+    "category": "Employers",
+    "description": "Decizie oficială a angajatorului pentru încetarea CIM prin acordul părților, conform Codului Muncii.",
+    "placeholders": [
+        { "key": "{{companie}}", "label": "Nume Companie SRL", "type": "text" },
+        { "key": "{{cui}}", "label": "CUI", "type": "text" },
+        { "key": "{{reprezentant}}", "label": "Nume Administrator / Director HR", "type": "text" },
+        { "key": "{{angajat}}", "label": "Nume Prenume Angajat", "type": "text" },
+        { "key": "{{cnp_angajat}}", "label": "CNP Angajat", "type": "text" },
+        { "key": "{{contract_numar}}", "label": "Număr Contract Individual de Muncă", "type": "text" },
+        { "key": "{{data_incetare}}", "label": "Data Încetării (DD.MM.YYYY)", "type": "date" }
+    ],
+    "content": "DECIZIE DE ÎNCETARE A CONTRACTULUI INDIVIDUAL DE MUNCĂ\nNr. ______ din data de ______________\n\nSocietatea {{companie}}, reprezentată legal prin {{reprezentant}}, în calitate de Angajator, având în vedere cererea depusă de angajatul {{angajat}} și înregistrată sub nr. ______;\nÎn temeiul prevederilor Art. 55 lit. b) din Legea nr. 53/2003 - Codul Muncii (prin acordul părților);\n\nDECIDE:\nArt. 1. Începând cu data de {{data_incetare}}, încetează Contractul Individual de Muncă nr. {{contract_numar}} al dlui/dnei. {{angajat}}, având CNP {{cnp_angajat}}, ce ocupa funcția în cadrul societății.\nArt. 2. Compartimentul Financiar-Contabil și Resurse Umane vor duce la îndeplinire prezenta decizie.\n\nAngajator ({{companie}}):\nSemnătura și Ștampila: ______________\n\nAm luat la cunoștință (Semnătură Angajat): ______________"
+  },
+  {
+    "id": "juridic_notificare_plata",
+    "name": "Notificare de Plată / Punere în Întârziere",
+    "category": "Juridice",
+    "description": "Act juridic oficial de somare a debitorului conform Art. 1522 din Codul Civil român.",
+    "placeholders": [
+        { "key": "{{creditor}}", "label": "Nume Persoană / Firmă Creditoare", "type": "text" },
+        { "key": "{{debitor}}", "label": "Nume Persoană / Firmă Debitoare", "type": "text" },
+        { "key": "{{adresa_debitor}}", "label": "Adresă Sediu / Domiciliu Debitor", "type": "text" },
+        { "key": "{{suma_datorata}}", "label": "Valoare în RON/EUR", "type": "number" },
+        { "key": "{{scadenta}}", "label": "Data Scadenței (DD.MM.YYYY)", "type": "date" },
+        { "key": "{{document_justificativ}}", "label": "Ex: Factura nr. 100 / Contract de împrumut", "type": "text" },
+        { "key": "{{termen_plata}}", "label": "Număr zile (Ex: 5 zile)", "type": "text" }
+    ],
+    "content": "NOTIFICARE DE PUNERE ÎN ÎNTÂRZIERE\n\nCătre: {{debitor}}\nAdresa: {{adresa_debitor}}\n\nSubsemnatul / Societatea {{creditor}}, în conformitate cu prevederile Art. 1522 din Codul Civil, vă somăm prin prezenta ca în termen de {{termen_plata}} zile de la primirea prezentei să achitați suma de {{suma_datorata}}.\n\nAceastă sumă reprezintă debitul restant datorat în baza următoarelor documente: {{document_justificativ}}, a cărui scadență a fost la data de {{scadenta}}.\nÎn caz de neconformare, ne rezervăm dreptul de a acționa pe cale judecătorească la instanțele competente, solicitând penalități de întârziere și cheltuieli de judecată.\n\nCreditor: {{creditor}}\nSemnătura: ______________"
+  }
+]

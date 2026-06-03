@@ -135,18 +135,6 @@ class ApiService {
   }
 
   // ========== Procesare PDF ==========
-  async mergePDFs(files) {
-    const formData = new FormData();
-    files.forEach(file => formData.append('files', file));
-    const response = await fetch(`${this.baseURL}/process/merge`, {
-      method: 'POST',
-      headers: this._getAuthHeaders(),
-      body: formData
-    });
-    if (!response.ok) throw new Error('Îmbinarea PDF-urilor a eșuat');
-    return response.blob();
-  }
-
   async aiSummarize(file) {
     const formData = new FormData();
     formData.append('file', file);
@@ -247,70 +235,6 @@ class ApiService {
       const error = await response.json();
       throw new Error(error.detail || 'Comprimarea a eșuat');
     }
-    return response.blob();
-  }
-
-  async splitPDF(file, pageRanges) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('page_ranges', pageRanges);
-    const response = await fetch(`${this.baseURL}/process/split`, {
-      method: 'POST',
-      headers: this._getAuthHeaders(),
-      body: formData
-    });
-    if (!response.ok) throw new Error('Împărțirea PDF-ului a eșuat');
-    return response.blob();
-  }
-
-  async compressPDF(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch(`${this.baseURL}/process/compress`, {
-      method: 'POST',
-      headers: this._getAuthHeaders(),
-      body: formData
-    });
-    if (!response.ok) throw new Error('Comprimarea PDF-ului a eșuat');
-    return response.blob();
-  }
-
-  async rotatePDF(file, rotation = 90) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('rotation', String(rotation));
-    const response = await fetch(`${this.baseURL}/process/rotate`, {
-      method: 'POST',
-      headers: this._getAuthHeaders(),
-      body: formData
-    });
-    if (!response.ok) throw new Error('Rotirea PDF-ului a eșuat');
-    return response.blob();
-  }
-
-  async protectPDF(file, password) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('password', password);
-    const response = await fetch(`${this.baseURL}/process/protect`, {
-      method: 'POST',
-      headers: this._getAuthHeaders(),
-      body: formData
-    });
-    if (!response.ok) throw new Error('Protejarea PDF-ului a eșuat');
-    return response.blob();
-  }
-
-  async unlockPDF(file, password) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('password', password);
-    const response = await fetch(`${this.baseURL}/process/unlock`, {
-      method: 'POST',
-      headers: this._getAuthHeaders(),
-      body: formData
-    });
-    if (!response.ok) throw new Error('Deblocarea PDF-ului a eșuat');
     return response.blob();
   }
 

@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { apiService } from '@/lib/api';
+import { documentProcessor } from '@/lib/documentProcessing';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
@@ -23,12 +24,105 @@ export default function DocumentEditor() {
   const [stirlingStatus, setStirlingStatus] = useState(null);
 
   const [showSignModal, setShowSignModal] = useState(false);
+  const [showAddTextModal, setShowAddTextModal] = useState(false);
+  const [showAddImageModal, setShowAddImageModal] = useState(false);
+  const [newTextValue, setNewTextValue] = useState('');
+  const [newTextSize, setNewTextSize] = useState(14);
+  const [newTextColor, setNewTextColor] = useState('#000000');
+  const [newImageFile, setNewImageFile] = useState(null);
+  const [newImageWidth, setNewImageWidth] = useState(150);
+  const [newImageHeight, setNewImageHeight] = useState(0);
   const [textToTranslate, setTextToTranslate] = useState('');
   const [textX, setTextX] = useState(100);
   const [textY, setTextY] = useState(100);
 
+  // Undo / Redo stacks store ArrayBuffer snapshots of PDF bytes
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const UNDO_LIMIT = 30;
+
   const fileInputRef = useRef(null);
   const signaturePadRef = useRef(null);
+  const imageInputRef = useRef(null);
+
+  // Helper: get current PDF as Blob
+  const getPdfBlobFromState = async () => {
+    if (!pdfFile) return null;
+    if (typeof pdfFile === 'string') {
+      const resp = await fetch(pdfFile);
+      return await resp.blob();
+    }
+    return pdfFile;
+  };
+
+  // Push current state to undo stack (ArrayBuffer)
+  const pushSnapshot = async () => {
+    try {
+      const blob = await getPdfBlobFromState();
+      if (!blob) return;
+      const buf = await blob.arrayBuffer();
+      setUndoStack(prev => {
+        const next = [...prev, buf];
+        if (next.length > UNDO_LIMIT) next.shift();
+        return next;
+      });
+      // clear redo when new action taken
+      setRedoStack([]);
+    } catch (e) {
+      console.warn('pushSnapshot failed', e);
+    }
+  };
+
+  // Apply bytes (ArrayBuffer or Uint8Array) as current PDF
+  const applyBytesAsPdf = (bytes, labelPrefix = '') => {
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    try { if (typeof pdfFile === 'string' && pdfFile.startsWith('blob:')) URL.revokeObjectURL(pdfFile); } catch(e){}
+    setPdfFile(url);
+    setDocumentName(prev => labelPrefix ? `${labelPrefix}_${prev}` : prev);
+  };
+
+  const handleUndo = async () => {
+    if (undoStack.length === 0) {
+      toast.info('Niciun pas pentru undo');
+      return;
+    }
+    try {
+      const last = undoStack[undoStack.length - 1];
+      const currentBlob = await getPdfBlobFromState();
+      const currentBuf = currentBlob ? await currentBlob.arrayBuffer() : null;
+      // move last to redo
+      setRedoStack(prev => currentBuf ? [...prev, currentBuf] : prev);
+      // pop undo
+      setUndoStack(prev => prev.slice(0, prev.length - 1));
+      applyBytesAsPdf(last, 'undo');
+      toast.success('Undo aplicat');
+    } catch (e) {
+      console.error('Undo failed', e);
+      toast.error('Undo eșuat');
+    }
+  };
+
+  const handleRedo = async () => {
+    if (redoStack.length === 0) {
+      toast.info('Niciun pas pentru redo');
+      return;
+    }
+    try {
+      const last = redoStack[redoStack.length - 1];
+      const currentBlob = await getPdfBlobFromState();
+      const currentBuf = currentBlob ? await currentBlob.arrayBuffer() : null;
+      // move current to undo
+      setUndoStack(prev => currentBuf ? [...prev, currentBuf] : prev);
+      // pop redo
+      setRedoStack(prev => prev.slice(0, prev.length - 1));
+      applyBytesAsPdf(last, 'redo');
+      toast.success('Redo aplicat');
+    } catch (e) {
+      console.error('Redo failed', e);
+      toast.error('Redo eșuat');
+    }
+  };
 
   const handleLoadPdf = (event) => {
     const file = event.target.files[0];
@@ -55,34 +149,61 @@ export default function DocumentEditor() {
     const fetchRes = await fetch(signatureImage);
     const signatureBlob = await fetchRes.blob();
 
-    const formData = new FormData();
-    formData.append('file', pdfFile);
-    formData.append('signature_image', signatureBlob, 'signature.png');
-    formData.append('page', currentPage);
-    formData.append('x', textX);
-    formData.append('y', textY);
-
     setIsProcessing(true);
     toast.info('Se aplică semnătura pe document...');
 
     try {
-      const response = await apiService.post('/process/sign', formData, {
-        responseType: 'blob',
-      });
+        // Snapshot before change
+        await pushSnapshot();
 
-      const newPdfBlob = response.data;
-      setPdfFile(newPdfBlob);
-      setCurrentPage(1);
-      setShowSignModal(false);
-      toast.success('Semnătura a fost aplicată cu succes!');
+        // Prefer local application using pdf-lib
+        let resultBlob = null;
+        try {
+          // pdfFile may be a File, Blob or object URL string
+          resultBlob = await documentProcessor.addSignature(pdfFile, signatureBlob, textX, textY, currentPage);
+        } catch (localErr) {
+          console.warn('Local signature failed, falling back to server:', localErr);
+        }
 
-    } catch (error) {
-      console.error('Eroare la aplicarea semnăturii:', error);
-      toast.error(error.message || 'A apărut o eroare la aplicarea semnăturii.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+        if (resultBlob) {
+          const url = URL.createObjectURL(resultBlob);
+          try { if (typeof pdfFile === 'string' && pdfFile.startsWith('blob:')) URL.revokeObjectURL(pdfFile); } catch(e){}
+          setPdfFile(url);
+          setDocumentName((prev) => `signed_${prev}`);
+          setCurrentPage(1);
+          setShowSignModal(false);
+          toast.success('Semnătura a fost aplicată local cu succes!');
+        } else {
+          // If local failed, send to backend
+          const formData = new FormData();
+          formData.append('file', pdfFile);
+          formData.append('signature_image', signatureBlob, 'signature.png');
+          formData.append('page', currentPage);
+          formData.append('x', textX);
+          formData.append('y', textY);
+
+          const response = await apiService.post('/process/sign', formData, {
+            responseType: 'blob',
+          });
+          const newPdfBlob = response.data;
+          const url = URL.createObjectURL(newPdfBlob);
+          try { if (typeof pdfFile === 'string' && pdfFile.startsWith('blob:')) URL.revokeObjectURL(pdfFile); } catch(e){}
+          setPdfFile(url);
+          setDocumentName((prev) => `signed_${prev}`);
+          setCurrentPage(1);
+          setShowSignModal(false);
+          toast.success('Semnătura a fost aplicată pe server.');
+        }
+
+      } catch (error) {
+        console.error('Eroare la aplicarea semnăturii:', error);
+        toast.error(error.message || 'A apărut o eroare la aplicarea semnăturii.');
+        // on error remove last snapshot
+        setUndoStack(prev => prev.slice(0, prev.length - 1));
+      } finally {
+        setIsProcessing(false);
+      }
+    };
 
   const checkStirlingHealth = async () => {
     toast.info("Se verifică starea serviciului Stirling PDF...");
@@ -121,6 +242,26 @@ export default function DocumentEditor() {
     }
   };
 
+  const handleDownloadCurrentPdf = async () => {
+    try {
+      const blob = await getPdfBlobFromState();
+      if (!blob) { toast.error('Niciun PDF disponibil pentru descărcare'); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = documentName && !documentName.startsWith('blob:') ? documentName : 'document.pdf';
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Fișierul a fost descărcat');
+    } catch (e) {
+      console.error('Download failed', e);
+      toast.error('Descărcarea fișierului a eșuat');
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-muted/40 p-4 md:p-6">
@@ -143,6 +284,18 @@ export default function DocumentEditor() {
               <Button variant="outline" size="sm" onClick={() => setShowSignModal(true)} disabled={!pdfFile}>
                 <PenTool className="w-4 h-4 mr-2 text-blue-600" />
                 Semnează Document
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowAddTextModal(true)} disabled={!pdfFile} className="ml-2">
+                <Type className="w-4 h-4 mr-2 text-green-600" />
+                Adaugă Text
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowAddImageModal(true)} disabled={!pdfFile} className="ml-2">
+                <UploadCloud className="w-4 h-4 mr-2 text-purple-600" />
+                Adaugă Imagine
+              </Button>
+              <Button variant="default" size="sm" onClick={() => handleDownloadCurrentPdf()} disabled={!pdfFile} className="ml-2">
+                <Download className="w-4 h-4 mr-2" />
+                Salvează / Descarcă
               </Button>
             </div>
           </CardContent>
@@ -198,11 +351,11 @@ export default function DocumentEditor() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Coordonata X</label>
-                    <Input type="number" value={textX} onChange={(e) => setTextX(e.target.value)} className="h-8 text-xs" />
+                    <Input type="number" value={textX} onChange={(e) => setTextX(Number(e.target.value) || 0)} className="h-8 text-xs" />
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Coordonata Y</label>
-                    <Input type="number" value={textY} onChange={(e) => setTextY(e.target.value)} className="h-8 text-xs" />
+                    <Input type="number" value={textY} onChange={(e) => setTextY(Number(e.target.value) || 0)} className="h-8 text-xs" />
                   </div>
                 </div>
               </CardContent>
@@ -291,6 +444,240 @@ export default function DocumentEditor() {
             </Card>
           </div>
         )}
+
+        {/* MODAL ADD TEXT */}
+        {showAddTextModal && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-lg">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">Adaugă Text pe PDF</h2>
+                  <button onClick={() => setShowAddTextModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-sm">Text</label>
+                  <textarea value={newTextValue} onChange={(e) => setNewTextValue(e.target.value)} className="w-full p-2 rounded border" rows={4} />
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-sm">Mărime</label>
+                      <input type="number" value={newTextSize} onChange={(e) => setNewTextSize(Number(e.target.value) || 12)} className="w-full p-2 rounded border" />
+                    </div>
+                    <div>
+                      <label className="text-sm">Culoare</label>
+                      <input type="color" value={newTextColor} onChange={(e) => setNewTextColor(e.target.value)} className="w-full p-1 rounded border" />
+                    </div>
+                    <div>
+                      <label className="text-sm">Pagina</label>
+                      <input type="number" value={currentPage} onChange={(e) => setCurrentPage(Number(e.target.value) || 1)} className="w-full p-2 rounded border" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm">X</label>
+                      <input type="number" value={textX} onChange={(e) => setTextX(Number(e.target.value) || 0)} className="w-full p-2 rounded border" />
+                    </div>
+                    <div>
+                      <label className="text-sm">Y</label>
+                      <input type="number" value={textY} onChange={(e) => setTextY(Number(e.target.value) || 0)} className="w-full p-2 rounded border" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddTextModal(false)}>Anulează</Button>
+                  <Button size="sm" onClick={async () => {
+                    if (!newTextValue) { toast.error('Introduceți textul.'); return; }
+                    setIsProcessing(true); toast.info('Se aplică textul...');
+                    try {
+                      // prepare pdf bytes
+                      let pdfBuf;
+                      if (typeof pdfFile === 'string') { pdfBuf = await (await fetch(pdfFile)).arrayBuffer(); }
+                      else { pdfBuf = await pdfFile.arrayBuffer(); }
+
+                      const colorObj = {
+                        r: parseInt(newTextColor.slice(1,3),16)/255,
+                        g: parseInt(newTextColor.slice(3,5),16)/255,
+                        b: parseInt(newTextColor.slice(5,7),16)/255,
+                      };
+
+                      const newBytes = await documentProcessor.addTextLocal(pdfBuf, newTextValue, { pageNumber: currentPage, x: textX, y: textY, size: newTextSize, color: colorObj });
+                      const blob = new Blob([newBytes], { type: 'application/pdf' });
+                      const url = URL.createObjectURL(blob);
+                      try { if (typeof pdfFile === 'string' && pdfFile.startsWith('blob:')) URL.revokeObjectURL(pdfFile); } catch(e){}
+                      setPdfFile(url);
+                      setDocumentName((prev) => `texted_${prev}`);
+                      setShowAddTextModal(false);
+                      toast.success('Textul a fost aplicat!');
+                    } catch (e) {
+                      console.error('Add text failed', e);
+                      toast.error('Aplicarea textului a eșuat.');
+                    } finally { setIsProcessing(false); }
+                  }}>Aplică Text</Button>
+                </div>
+
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        {/* MODAL ADD TEXT */}
+        {showAddTextModal && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-lg">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">Adaugă Text pe PDF</h2>
+                  <button onClick={() => setShowAddTextModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-sm">Text</label>
+                  <textarea value={newTextValue} onChange={(e) => setNewTextValue(e.target.value)} className="w-full p-2 rounded border" rows={4} />
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-sm">Mărime</label>
+                      <input type="number" value={newTextSize} onChange={(e) => setNewTextSize(Number(e.target.value) || 12)} className="w-full p-2 rounded border" />
+                    </div>
+                    <div>
+                      <label className="text-sm">Culoare</label>
+                      <input type="color" value={newTextColor} onChange={(e) => setNewTextColor(e.target.value)} className="w-full p-1 rounded border" />
+                    </div>
+                    <div>
+                      <label className="text-sm">Pagina</label>
+                      <input type="number" value={currentPage} onChange={(e) => setCurrentPage(Number(e.target.value) || 1)} className="w-full p-2 rounded border" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm">X</label>
+                      <input type="number" value={textX} onChange={(e) => setTextX(Number(e.target.value) || 0)} className="w-full p-2 rounded border" />
+                    </div>
+                    <div>
+                      <label className="text-sm">Y</label>
+                      <input type="number" value={textY} onChange={(e) => setTextY(Number(e.target.value) || 0)} className="w-full p-2 rounded border" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddTextModal(false)}>Anulează</Button>
+                  <Button size="sm" onClick={async () => {
+                    if (!newTextValue) { toast.error('Introduceți textul.'); return; }
+                    setIsProcessing(true); toast.info('Se aplică textul...');
+                    try {
+                      // prepare pdf bytes
+                      let pdfBuf;
+                      if (typeof pdfFile === 'string') { pdfBuf = await (await fetch(pdfFile)).arrayBuffer(); }
+                      else { pdfBuf = await pdfFile.arrayBuffer(); }
+
+                      const colorObj = {
+                        r: parseInt(newTextColor.slice(1,3),16)/255,
+                        g: parseInt(newTextColor.slice(3,5),16)/255,
+                        b: parseInt(newTextColor.slice(5,7),16)/255,
+                      };
+
+                      const newBytes = await documentProcessor.addTextLocal(pdfBuf, newTextValue, { pageNumber: currentPage, x: textX, y: textY, size: newTextSize, color: colorObj });
+                      const blob = new Blob([newBytes], { type: 'application/pdf' });
+                      const url = URL.createObjectURL(blob);
+                      try { if (typeof pdfFile === 'string' && pdfFile.startsWith('blob:')) URL.revokeObjectURL(pdfFile); } catch(e){}
+                      setPdfFile(url);
+                      setDocumentName((prev) => `texted_${prev}`);
+                      setShowAddTextModal(false);
+                      toast.success('Textul a fost aplicat!');
+                    } catch (e) {
+                      console.error('Add text failed', e);
+                      toast.error('Aplicarea textului a eșuat.');
+                    } finally { setIsProcessing(false); }
+                  }}>Aplică Text</Button>
+                </div>
+
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      {/* ADD IMAGE MODAL (fallback/alternate placement) */}
+      {showAddImageModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg">
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">Adaugă Imagine pe PDF</h2>
+                <button onClick={() => setShowAddImageModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-sm">Imagine</label>
+                <input type="file" ref={imageInputRef} accept="image/*" onChange={(e) => setNewImageFile(e.target.files[0] || null)} className="w-full p-2 rounded border" />
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-sm">Lățime</label>
+                    <input type="number" value={newImageWidth} onChange={(e) => setNewImageWidth(Number(e.target.value) || 150)} className="w-full p-2 rounded border" />
+                  </div>
+                  <div>
+                    <label className="text-sm">Înălțime (opțional)</label>
+                    <input type="number" value={newImageHeight} onChange={(e) => setNewImageHeight(Number(e.target.value) || 0)} className="w-full p-2 rounded border" />
+                  </div>
+                  <div>
+                    <label className="text-sm">Pagina</label>
+                    <input type="number" value={currentPage} onChange={(e) => setCurrentPage(Number(e.target.value) || 1)} className="w-full p-2 rounded border" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm">X</label>
+                    <input type="number" value={textX} onChange={(e) => setTextX(Number(e.target.value) || 0)} className="w-full p-2 rounded border" />
+                  </div>
+                  <div>
+                    <label className="text-sm">Y</label>
+                    <input type="number" value={textY} onChange={(e) => setTextY(Number(e.target.value) || 0)} className="w-full p-2 rounded border" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="ghost" size="sm" onClick={() => setShowAddImageModal(false)}>Anulează</Button>
+                <Button size="sm" onClick={async () => {
+                  if (!newImageFile) { toast.error('Selectați o imagine.'); return; }
+                  setIsProcessing(true); toast.info('Se aplică imaginea...');
+                  try {
+                    let pdfBuf;
+                    if (typeof pdfFile === 'string') { pdfBuf = await (await fetch(pdfFile)).arrayBuffer(); }
+                    else { pdfBuf = await pdfFile.arrayBuffer(); }
+
+                    await pushSnapshot();
+                    const imgBuf = await newImageFile.arrayBuffer();
+                    const newBytes = await documentProcessor.addImageLocal(pdfBuf, imgBuf, { pageNumber: currentPage, x: textX, y: textY, width: newImageWidth, height: newImageHeight || null });
+                    const blob = new Blob([newBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    try { if (typeof pdfFile === 'string' && pdfFile.startsWith('blob:')) URL.revokeObjectURL(pdfFile); } catch(e){}
+                    setPdfFile(url);
+                    setDocumentName((prev) => `imged_${prev}`);
+                    setShowAddImageModal(false);
+                    toast.success('Imaginea a fost aplicată!');
+                  } catch (e) {
+                    console.error('Add image failed', e);
+                    toast.error('Aplicarea imaginii a eșuat.');
+                  } finally { setIsProcessing(false); }
+                }}>Aplică Imagine</Button>
+              </div>
+
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       </div>
     </div>
   );

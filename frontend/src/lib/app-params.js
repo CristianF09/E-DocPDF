@@ -1,7 +1,7 @@
 // frontend/src/lib/app-params.js
 
 // ========== CONFIGURARE BASE URL ==========
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 // ========== ENDPOINT-URI BACKEND SHIFTPDF ==========
 export const API_ENDPOINTS = {

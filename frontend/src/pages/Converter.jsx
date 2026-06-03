@@ -160,30 +160,15 @@ export default function Converter() {
         case 'compress':
           blob = await apiService.stirlingCompress(mainFile);
           break;
-        case 'merge':
-          blob = await apiService.mergePDFs(files);
-          break;
-        case 'split':
-          if (!pageRanges) throw new Error('Vă rugăm să introduceți intervalul de pagini.');
-          blob = await apiService.splitPDF(mainFile, pageRanges);
-          break;
-        case 'rotate':
-          blob = await apiService.rotatePDF(mainFile, parseInt(rotation));
-          break;
-        case 'protect':
-          if (!password) throw new Error('Parola este obligatorie pentru protecție.');
-          blob = await apiService.protectPDF(mainFile, password);
-          break;
-        case 'unlock':
-          if (!password) throw new Error('Introduceți parola pentru a debloca documentul.');
-          blob = await apiService.unlockPDF(mainFile, password);
-          break;
         case 'convert':
           if (!targetFormat) throw new Error('Vă rugăm să selectați formatul țintă.');
           blob = await apiService.stirlingConvert(mainFile, targetFormat);
           break;
         default:
-          throw new Error('Instrumentul selectat nu este implementat.');
+          // Pentru celelalte unelte, vom arunca o eroare temporară
+          // Până la implementarea completă pe backend
+          toast.info(`Instrumentul '${toolMode}' este în curs de dezvoltare.`);
+          throw new Error('Instrumentul selectat nu este implementat complet.');
       }
 
       const url = URL.createObjectURL(blob);
