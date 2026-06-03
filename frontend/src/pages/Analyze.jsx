@@ -205,8 +205,8 @@ export default function AnalyzePage() {
                       </div>
                     )
                   ) : (
-                  {/* Fallback block if JSON array transformation failed */}
                     <div className="p-3 border rounded-lg bg-amber-50/50 text-amber-900 text-xs flex items-start gap-2">
+                      {/* Fallback block if JSON array transformation failed */}
                       <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
                       <p className="whitespace-pre-wrap font-sans">{analysisResult.suggestions}</p>
                     </div>
@@ -214,8 +214,9 @@ export default function AnalyzePage() {
                 </div>
               </CardContent>
             </Card>
-          )}
-          
-          </motion.div>
-        );
-      } 
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
