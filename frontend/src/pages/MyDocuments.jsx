@@ -31,14 +31,26 @@ export default function MyDocuments() {
   const [statusFilter, setStatusFilter] = useState('all');
   const _queryClient = useQueryClient();
 
-  const { data: documents = [], isLoading: _isLoading } = useQuery({
+  const { data: documents = [], isLoading } = useQuery({
     queryKey: ['documents'],
-    queryFn: async () => [],
+    queryFn: async () => {
+      const docs = await apiService.getDocuments();
+      return docs.map(doc => ({
+        ...doc,
+        title: doc.filename,
+        category: 'General',
+        created_date: doc.upload_date
+      }));
+    },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => Promise.resolve(),
-    onSuccess: () => {},
+    mutationFn: (id) => apiService.deleteDocument(id),
+    onSuccess: () => {
+      _queryClient.invalidateQueries({ queryKey: ['documents'] });
+      toast.success('Documentul a fost șters.');
+    },
+    onError: (err) => toast.error(err.message || 'Eroare la ștergerea documentului.'),
   });
 
   const filtered = documents.filter(doc => {

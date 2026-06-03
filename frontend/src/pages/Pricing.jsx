@@ -1,11 +1,8 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, Crown, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
-import Navbar from '@/components/layout/Navbar';
-
 
 const plans = [
   {
@@ -13,56 +10,56 @@ const plans = [
     name: 'Gratuit',
     price: '0',
     period: '',
-    description: 'Pentru a testa platforma',
+    description: 'Pentru testarea platformei',
     features: [
-      { text: '5 conversii / lună', included: true },
-      { text: '3 șabloane de bază', included: true },
-      { text: 'Traducere RO ↔ EN', included: true },
-      { text: 'Semnătură simplă', included: true },
-      { text: 'Semnătură calificată', included: false },
+      { text: '5 conversii / luna', included: true },
+      { text: '3 sabloane de baza', included: true },
+      { text: 'Traducere RO - EN', included: true },
+      { text: 'Semnatura simpla', included: true },
+      { text: 'Semnatura calificata', included: false },
       { text: 'OCR', included: false },
-      { text: 'Export în masă', included: false },
+      { text: 'Export in masa', included: false },
       { text: 'Suport prioritar', included: false },
     ],
-    cta: 'Începe Gratuit',
+    cta: 'Incepe gratuit',
     popular: false,
   },
   {
     id: 'weekly',
-    name: 'Săptămânal',
+    name: 'Saptamanal',
     price: '29',
-    period: '/ săptămână',
+    period: '/ saptamana',
     description: 'Pentru proiecte scurte',
     features: [
-      { text: '50 conversii / săptămână', included: true },
-      { text: 'Toate șabloanele', included: true },
-      { text: 'Traducere 5 limbi UE', included: true },
-      { text: 'Semnătură simplă', included: true },
-      { text: 'Semnătură calificată', included: true },
+      { text: '50 conversii / saptamana', included: true },
+      { text: 'Toate sabloanele', included: true },
+      { text: 'Traducere in 5 limbi UE', included: true },
+      { text: 'Semnatura simpla', included: true },
+      { text: 'Semnatura calificata', included: true },
       { text: 'OCR basic', included: true },
-      { text: 'Export în masă', included: false },
+      { text: 'Export in masa', included: false },
       { text: 'Suport prioritar', included: false },
     ],
-    cta: 'Abonează-te',
+    cta: 'Aboneaza-te',
     popular: false,
   },
   {
     id: 'monthly',
     name: 'Lunar',
     price: '79',
-    period: '/ lună',
+    period: '/ luna',
     description: 'Cel mai popular pentru IMM-uri',
     features: [
       { text: 'Conversii nelimitate', included: true },
-      { text: 'Toate șabloanele + custom', included: true },
+      { text: 'Toate sabloanele + custom', included: true },
       { text: 'Toate limbile UE', included: true },
-      { text: 'Semnătură simplă', included: true },
-      { text: 'Semnătură calificată', included: true },
+      { text: 'Semnatura simpla', included: true },
+      { text: 'Semnatura calificata', included: true },
       { text: 'OCR avansat', included: true },
-      { text: 'Export în masă', included: true },
+      { text: 'Export in masa', included: true },
       { text: 'Suport prioritar', included: false },
     ],
-    cta: 'Abonează-te',
+    cta: 'Aboneaza-te',
     popular: true,
   },
   {
@@ -70,89 +67,86 @@ const plans = [
     name: 'Anual',
     price: '699',
     period: '/ an',
-    description: 'Cea mai bună valoare • Economisești 27%',
+    description: 'Cea mai buna valoare - economisesti 27%',
     features: [
       { text: 'Conversii nelimitate', included: true },
-      { text: 'Toate șabloanele + custom', included: true },
+      { text: 'Toate sabloanele + custom', included: true },
       { text: 'Toate limbile UE', included: true },
-      { text: 'Semnătură simplă', included: true },
-      { text: 'Semnătură calificată', included: true },
+      { text: 'Semnatura simpla', included: true },
+      { text: 'Semnatura calificata', included: true },
       { text: 'OCR avansat', included: true },
-      { text: 'Export în masă', included: true },
+      { text: 'Export in masa', included: true },
       { text: 'Suport prioritar dedicat', included: true },
     ],
-    cta: 'Abonează-te',
+    cta: 'Aboneaza-te',
     popular: false,
   },
 ];
 
 export default function Pricing() {
-  const location = useLocation();
-  const isStandalone = !location.pathname.startsWith('/dashboard');
-
-  const content = (
-    <div className={isStandalone ? "pt-24 pb-16 px-4 sm:px-6" : "p-6 pb-24 md:pb-6"}>
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-12">
+  return (
+    <div className="px-4 pb-16 pt-24 sm:px-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-12 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-4"
+            className="mb-4 inline-flex items-center gap-2 rounded-full glass-card px-4 py-1.5"
           >
-            <Crown className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-medium text-primary">Prețuri Transparente</span>
+            <Crown className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-primary">Preturi transparente</span>
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-3xl md:text-4xl font-bold font-space mb-3"
+            className="mb-3 font-space text-4xl font-bold md:text-5xl"
           >
-            Alege Planul Potrivit
+            Alege planul potrivit
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-muted-foreground max-w-lg mx-auto"
+            className="mx-auto max-w-lg text-muted-foreground"
           >
-            Toate prețurile sunt în RON și includ TVA. Anulează oricând.
+            Toate preturile sunt in RON si includ TVA. Poti anula oricand.
           </motion.p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {plans.map((plan, index) => (
             <motion.div
               key={plan.id}
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className={`relative bg-card rounded-2xl border p-6 flex flex-col ${
-                plan.popular ? 'border-primary/50 shadow-lg shadow-primary/5' : 'border-border'
+              className={`relative flex flex-col rounded-2xl glass-card p-6 backdrop-blur-md ${
+                plan.popular ? 'border-primary/50 shadow-xl shadow-primary/10 ring-1 ring-primary/20' : 'border-white/10'
               }`}
             >
               {plan.popular && (
-                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] px-3">
-                  <Star className="w-3 h-3 mr-1" /> Cel Mai Popular
+                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary px-3 text-[10px] text-primary-foreground">
+                  <Star className="mr-1 h-3 w-3" /> Cel mai popular
                 </Badge>
               )}
-              
+
               <div className="mb-6">
-                <h3 className="font-semibold text-sm">{plan.name}</h3>
-                <div className="flex items-baseline gap-1 mt-2">
-                  <span className="text-3xl font-bold font-space">{plan.price}</span>
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{plan.name}</h3>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="font-space text-4xl font-bold">{plan.price}</span>
                   <span className="text-xs text-muted-foreground">RON{plan.period}</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">{plan.description}</p>
+                <p className="mt-2 text-xs italic text-muted-foreground">{plan.description}</p>
               </div>
 
-              <ul className="space-y-3 mb-6 flex-1">
-                {plan.features.map(feature => (
+              <ul className="mb-6 flex-1 space-y-3">
+                {plan.features.map((feature) => (
                   <li key={feature.text} className="flex items-center gap-2">
                     {feature.included ? (
-                      <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                      <Check className="h-4 w-4 flex-shrink-0 text-primary" />
                     ) : (
-                      <X className="w-4 h-4 text-muted-foreground/30 flex-shrink-0" />
+                      <X className="h-4 w-4 flex-shrink-0 text-muted-foreground/30" />
                     )}
                     <span className={`text-xs ${feature.included ? 'text-foreground' : 'text-muted-foreground/50'}`}>
                       {feature.text}
@@ -162,9 +156,9 @@ export default function Pricing() {
               </ul>
 
               <Button
-                className={`w-full ${
+                className={`h-12 w-full transition-all duration-300 ${
                   plan.popular
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90'
                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                 }`}
               >
@@ -176,16 +170,4 @@ export default function Pricing() {
       </div>
     </div>
   );
-
-  if (isStandalone) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        {content}
-
-      </div>
-    );
-  }
-
-  return content;
 }

@@ -4,8 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Globe, Shield, Loader2 } from 'lucide-react';
+import { User, Globe, Shield, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 
 export default function Settings() {
   const [language, setLanguage] = useState('ro');
@@ -13,89 +14,91 @@ export default function Settings() {
 
   const handleSave = async () => {
     setLoading(true);
-    toast.success('Setările au fost salvate!');
+    toast.success('Setarile au fost salvate!');
     setLoading(false);
   };
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6 pb-24 md:pb-6 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold font-space">Setări</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gestionează-ți contul și preferințele</p>
+    <div className="mx-auto max-w-3xl space-y-8 p-6 pb-24 md:pb-6">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col"
+      >
+        <h1 className="font-space text-3xl font-bold">Setari</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Gestioneaza contul si preferintele de sistem.
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Card className="glass-card border-white/10">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <User className="h-4 w-4 text-primary" /> Profil utilizator
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Nume</Label>
+              <Input value="Demo User" disabled className="bg-background/50 border-white/10" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Email</Label>
+              <Input value="demo@example.com" disabled className="bg-background/50 border-white/10" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-white/10">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Globe className="h-4 w-4 text-primary" /> Preferinte lingvistice
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Limba interfetei</Label>
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger className="bg-background/50 border-white/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ro">Romana</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="fr">Francais</SelectItem>
+                  <SelectItem value="de">Deutsch</SelectItem>
+                  <SelectItem value="es">Espanol</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Profile */}
-      <Card className="bg-card border-border">
+      <Card className="glass-card overflow-hidden border-white/10">
         <CardHeader className="pb-4">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <User className="w-4 h-4 text-primary" /> Profil
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Shield className="h-4 w-4 text-primary" /> Securitate si confidentialitate
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label className="text-xs">Nume</Label>
-            <Input value="Demo User" disabled className="bg-secondary/50 mt-1" />
+        <CardContent className="space-y-6">
+          <div className="rounded-xl border border-primary/10 bg-primary/5 p-4 backdrop-blur-sm">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Contul este protejat prin autentificare securizata. Datele sunt criptate cu SSL/TLS si procesate conform GDPR.
+            </p>
           </div>
-          <div>
-            <Label className="text-xs">Email</Label>
-            <Input value="demo@example.com" disabled className="bg-secondary/50 mt-1" />
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" size="sm" className="border-destructive/30 text-destructive transition-all hover:bg-destructive/10">
+              Deconectare
+            </Button>
+            <Button onClick={handleSave} disabled={loading} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salveaza modificarile
+            </Button>
           </div>
         </CardContent>
       </Card>
-
-      {/* Language */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Globe className="w-4 h-4 text-primary" /> Limbă
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Label className="text-xs mb-2 block">Limba preferată a contului</Label>
-          <Select value={language} onValueChange={setLanguage}>
-            <SelectTrigger className="bg-secondary/50 w-full max-w-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ro">Română</SelectItem>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="fr">Français</SelectItem>
-              <SelectItem value="de">Deutsch</SelectItem>
-              <SelectItem value="es">Español</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
-      {/* Security */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Shield className="w-4 h-4 text-primary" /> Securitate
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground mb-4">
-            Contul tău este protejat prin autentificare securizată. 
-            Toate datele sunt criptate cu SSL/TLS.
-          </p>
-          <Button variant="outline" size="sm" onClick={() => toast.info('Deconectare mock')} className="text-destructive border-destructive/30 hover:bg-destructive/10">
-            Deconectare
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Button onClick={handleSave} className="bg-primary text-primary-foreground hover:bg-primary/90">
-        Salvează Setările
-      </Button>
     </div>
   );
 }

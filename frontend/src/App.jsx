@@ -75,6 +75,7 @@ const AuthenticatedApp = () => {
       <Route path="/tools" element={<Layout><Tools /></Layout>} />
       <Route path="/settings" element={<Layout><Settings /></Layout>} />
       <Route path="/contact" element={<Layout><Contact /></Layout>} />
+      <Route path="/word-processor" element={<Layout><DocumentEditor /></Layout>} />
       <Route path="/tools/compress" element={<Layout><Converter /></Layout>} />
       <Route path="/tools/merge" element={<Layout><Converter /></Layout>} />
       <Route path="/tools/split" element={<Layout><Converter /></Layout>} />

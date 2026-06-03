@@ -7,7 +7,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import Draggable from 'react-draggable';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { UploadCloud, FileText, Edit, Trash2, Save, MousePointerClick } from 'lucide-react';
+import { UploadCloud, FileText, Edit, Trash2, Save, MousePointerClick, ShieldCheck } from 'lucide-react';
 import apiService from '../lib/api';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -73,12 +73,10 @@ const SignPage = () => {
         return;
     }
 
-    // Calculează coordonatele relative la pagina PDF
     const pageRect = pageElement.getBoundingClientRect();
-    const finalX = sigPosition.x;
-    const finalY = sigPosition.y;
+    const finalX = Math.round(sigPosition.x);
+    const finalY = Math.round(sigPosition.y);
 
-    // Validare coordonate
     if (finalX < 0 || finalY < 0 || finalX > pageRect.width || finalY > pageRect.height) {
         toast.warning("Semnătura pare să fie în afara paginii. Vă rugăm să o repoziționați.");
         return;
@@ -87,8 +85,8 @@ const SignPage = () => {
     setIsLoading(true);
     try {
       const signatureBlob = await (await fetch(signature)).blob();
-      const signedPdfBlob = await apiService.stirlingSign(file, signatureBlob, String(currentPage), Math.round(finalX), Math.round(finalY));
-      
+      const signedPdfBlob = await apiService.stirlingSign(file, signatureBlob, String(currentPage), finalX, finalY);
+
       const url = URL.createObjectURL(signedPdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -99,8 +97,7 @@ const SignPage = () => {
       URL.revokeObjectURL(url);
 
       toast.success("PDF semnat și descărcat cu succes!");
-      
-      // Reset state
+
       setFile(null);
       setFileUrl(null);
       setSignature(null);
@@ -129,6 +126,10 @@ const SignPage = () => {
                 <UploadCloud className="mx-auto h-10 w-10 text-muted-foreground" />
                 <p className="mt-2">Trageți fișierul aici sau faceți clic.</p>
               </div>
+              <div className="mt-3 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-green-600" />
+                <span>Conexiune securizată și confidențială.</span>
+              </div>
               {file && <div className="mt-4 flex items-center"><FileText className="h-5 w-5 mr-2" /><span>{file.name}</span></div>}
             </CardContent>
           </Card>
@@ -145,9 +146,9 @@ const SignPage = () => {
               </div>
             </CardContent>
           </Card>
-           <Button onClick={handleApplySignature} disabled={!file || !signature || !isSignaturePlaced || isLoading} className="w-full">
-              <Save className="mr-2 h-4 w-4" />
-              {isLoading ? 'Se procesează...' : 'Aplică Semnătura și Descarcă'}
+           <Button onClick={handleApplySignature} disabled={!file || !signature || !isSignaturePlaced || isLoading} className="w-full py-6 text-lg bg-blue-600 hover:bg-blue-700">
+              <ShieldCheck className="mr-2 h-5 w-5" />
+              {isLoading ? 'Se sigilează...' : 'Finalizează și Sigilează Documentul'}
             </Button>
         </div>
 

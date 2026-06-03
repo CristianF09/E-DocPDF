@@ -85,4 +85,3 @@ uvicorn==0.47.0
 watchfiles==1.1.1
 websockets==16.0
 xlsxwriter==3.2.9
-httpx

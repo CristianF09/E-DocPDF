@@ -6,86 +6,76 @@ import { motion } from 'framer-motion';
 
 export default function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-      {/* Background effects - already handled by body gradients, add extra sparkle */}
+    <section className="relative flex min-h-screen items-center justify-center overflow-hidden pt-16">
       <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-[120px]" />
+        <div className="float absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="float-delay-1 absolute bottom-1/4 right-1/4 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-500/5 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 text-center">
-        {/* Badge - animated glass style */}
+      <div className="relative z-10 mx-auto max-w-6xl px-4 text-center sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 px-5 py-2 rounded-full glass-card mb-10"
+          className="mb-10 inline-flex items-center gap-2 rounded-full glass-card px-5 py-2"
         >
-          <Shield className="w-4 h-4 text-emerald-400" />
-          <span className="text-sm font-medium">Conform legislației UE/RO • Semnături calificate</span>
+          <Shield className="h-4 w-4 text-emerald-400" />
+          <span className="text-sm font-medium">Conform legislatiei UE/RO - semnaturi calificate</span>
         </motion.div>
 
-        {/* Heading with gradient text */}
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-4xl sm:text-5xl md:text-7xl font-bold font-space leading-tight tracking-tight mb-8"
+          className="mb-8 font-space text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-7xl"
         >
-          Creează, Convertește și{' '}
-          <span className="gradient-text">
-            Semnează
-          </span>{' '}
-          Documente
+          Creeaza, converteste si <span className="gradient-text">semneaza</span> documente
         </motion.h1>
 
-        {/* Subtitle */}
         <motion.p
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="text-lg md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed"
+          className="mx-auto mb-12 max-w-3xl text-lg leading-relaxed text-muted-foreground md:text-2xl"
         >
-          Platformă completă pentru gestionarea documentelor legale și de business. 
-          Conversie între formate, traduceri și semnături digitale calificate, toate într-un singur loc.
+          Platforma completa pentru gestionarea documentelor legale si de business.
+          Conversie intre formate, traduceri si semnaturi digitale calificate, toate intr-un singur loc.
         </motion.p>
 
-        {/* CTAs - only "Începe Gratuit" */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="flex items-center justify-center mb-20"
+          className="mb-20 flex items-center justify-center"
         >
           <Link to="/tools">
             <div className="animated-border">
-              <Button size="lg" className="bg-background hover:bg-background/90 text-foreground px-14 h-14 text-base font-semibold gap-2 rounded-[calc(var(--radius)+1px)]">
-                Începe Gratuit
-                <ArrowRight className="w-5 h-5" />
+              <Button size="lg" className="h-14 rounded-[calc(var(--radius)+1px)] bg-background px-14 text-base font-semibold text-foreground hover:bg-background/90">
+                Incepe gratuit
+                <ArrowRight className="h-5 w-5" />
               </Button>
             </div>
           </Link>
         </motion.div>
 
-        {/* Trust indicators */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.5 }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto"
+          className="mx-auto grid max-w-3xl grid-cols-1 gap-6 sm:grid-cols-3"
         >
-          <div className="glass-card px-6 py-4 rounded-xl flex items-center justify-center gap-3">
-            <Zap className="w-5 h-5 text-emerald-400" />
-            <span className="text-base font-medium">Conversie Instantanee</span>
+          <div className="flex items-center justify-center gap-3 rounded-xl glass-card px-6 py-4">
+            <Zap className="h-5 w-5 text-emerald-400" />
+            <span className="text-base font-medium">Conversie instantanee</span>
           </div>
-          <div className="glass-card px-6 py-4 rounded-xl flex items-center justify-center gap-3">
-            <Shield className="w-5 h-5 text-blue-400" />
-            <span className="text-base font-medium">Securitate Bancară</span>
+          <div className="flex items-center justify-center gap-3 rounded-xl glass-card px-6 py-4">
+            <Shield className="h-5 w-5 text-blue-400" />
+            <span className="text-base font-medium">Securitate bancara</span>
           </div>
-          <div className="glass-card px-6 py-4 rounded-xl flex items-center justify-center gap-3">
-            <Globe className="w-5 h-5 text-purple-400" />
-            <span className="text-base font-medium">Toate Limbile UE</span>
+          <div className="flex items-center justify-center gap-3 rounded-xl glass-card px-6 py-4">
+            <Globe className="h-5 w-5 text-purple-400" />
+            <span className="text-base font-medium">Toate limbile UE</span>
           </div>
         </motion.div>
       </div>

@@ -1,20 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import { Image } from '@tiptap/extension-image';
-import { Table } from '@tiptap/extension-table';
-import { TableRow } from '@tiptap/extension-table-row';
-import { TableCell } from '@tiptap/extension-table-cell';
-import { TableHeader } from '@tiptap/extension-table-header';
-import { TextAlign } from '@tiptap/extension-text-align';
-import { Underline } from '@tiptap/extension-underline';
-import { Link } from '@tiptap/extension-link';
+import React, { useState, useRef, useEffect } from 'react';
+import { Document, Page, pdfjs } from 'react-pdf';
+import SignaturePad from 'react-signature-canvas';
 import { 
-  Bold, Italic, Underline as UnderlineIcon, Strikethrough, 
-  List, ListOrdered, AlignLeft, AlignCenter, AlignRight, 
-  AlignJustify, Link as LinkIcon, Image as ImageIcon, 
-  Table as TableIcon, Undo, Redo, Save, Download, FileText,
-  Eye, X
+  Bold, Italic, Type, AlignLeft, AlignCenter, AlignRight,
+  Undo, Redo, Save, Download, FileText, Eye, X, PenTool, Languages, Move, Loader2, UploadCloud, ServerCrash
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,231 +11,286 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { apiService } from '@/lib/api';
 
-// Toolbar button
-const ToolbarButton = ({ onClick, isActive, icon: Icon, disabled, title }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    className={`p-2 rounded-md transition-colors ${
-      isActive 
-        ? 'bg-primary/20 text-primary' 
-        : 'hover:bg-accent text-muted-foreground hover:text-foreground'
-    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-    title={title}
-  >
-    <Icon className="w-4 h-4" />
-  </button>
-);
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 export default function DocumentEditor() {
-  const [documentName, setDocumentName] = useState('Document nou');
-  const [isExporting, setIsExporting] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [documentName, setDocumentName] = useState('Niciun document încărcat');
+  const [pdfFile, setPdfFile] = useState(null);
+  const [numPages, setNumPages] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [stirlingStatus, setStirlingStatus] = useState(null);
+
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [textToTranslate, setTextToTranslate] = useState('');
+  const [textX, setTextX] = useState(100);
+  const [textY, setTextY] = useState(100);
+
   const fileInputRef = useRef(null);
+  const signaturePadRef = useRef(null);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Image.configure({ inline: true, allowBase64: true }),
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableCell,
-      TableHeader,
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Underline,
-      Link.configure({ openOnClick: false }),
-    ],
-    content: `
-      <h1>Document nou</h1>
-      <p>Bun venit la editorul E-DocPDF. Poți să scrii, să formatezi text, să adaugi imagini, tabele și multe altele.</p>
-      <p>Acest editor este compatibil cu <strong>Microsoft Word</strong> – poți exporta documentul ca <strong>HTML</strong> (deschis direct în Word) sau ca <strong>PDF</strong>.</p>
-      <ul>
-        <li>Listă neordonată</li>
-        <li>Text <em>italic</em> și <u>subliniat</u></li>
-      </ul>
-      <h2>Exemplu de tabel</h2>
-      <table style="border-collapse: collapse; width: 100%;">
-        <thead>
-          <tr>
-            <th style="border: 1px solid #ccc; padding: 8px;">Nume</th>
-            <th style="border: 1px solid #ccc; padding: 8px;">Funcție</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="border: 1px solid #ccc; padding: 8px;">Ion Popescu</td>
-            <td style="border: 1px solid #ccc; padding: 8px;">Manager</td>
-          </tr>
-        </tbody>
-      </table>
-    `,
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[400px] p-4',
-      },
-    },
-  });
-
-  // Funcții pentru toolbar
-  const toggleBold = () => editor?.chain().focus().toggleBold().run();
-  const toggleItalic = () => editor?.chain().focus().toggleItalic().run();
-  const toggleUnderline = () => editor?.chain().focus().toggleUnderline().run();
-  const toggleStrike = () => editor?.chain().focus().toggleStrike().run();
-  const toggleBulletList = () => editor?.chain().focus().toggleBulletList().run();
-  const toggleOrderedList = () => editor?.chain().focus().toggleOrderedList().run();
-  const setTextAlign = (align) => editor?.chain().focus().setTextAlign(align).run();
-  const undo = () => editor?.chain().focus().undo().run();
-  const redo = () => editor?.chain().focus().redo().run();
-
-  const addImage = () => {
-    const url = window.prompt('Introdu URL-ul imaginii:');
-    if (url) editor?.chain().focus().setImage({ src: url }).run();
-  };
-
-  const addTable = () => {
-    editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
-  };
-
-  // Export ca HTML
-  const exportAsHTML = () => {
-    const htmlContent = editor?.getHTML();
-    const fullHtml = `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>${documentName}</title></head>
-<body>${htmlContent}</body>
-</html>`;
-    const blob = new Blob([fullHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${documentName.replace(/[^a-z0-9]/gi, '_')}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Document exportat ca HTML (poate fi deschis în Microsoft Word)');
-  };
-
-  // Export ca PDF via backend
-  const exportAsPDF = async () => {
-    if (!editor) return;
-    setIsExporting(true);
-    try {
-      const htmlContent = editor.getHTML();
-      const fullHtml = `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>${documentName}</title>
-<style>body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.5; } 
-table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-th, td { border: 1px solid #ccc; padding: 8px; }</style>
-</head>
-<body>${htmlContent}</body>
-</html>`;
-      const blob = new Blob([fullHtml], { type: 'text/html' });
-      const file = new File([blob], 'document.html', { type: 'text/html' });
-      const pdfBlob = await apiService.convertToPDF(file);
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${documentName.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Document exportat ca PDF');
-    } catch (error) {
-      console.error(error);
-      toast.error('Eroare la exportul PDF. Verifică backend-ul.');
-    } finally {
-      setIsExporting(false);
+  const handleLoadPdf = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type === 'application/pdf') {
+      setDocumentName(file.name);
+      setPdfFile(file);
+      setCurrentPage(1);
+      setNumPages(null); // Reset on new file
+    } else {
+      toast.error('Vă rugăm să încărcați un fișier valid de tip PDF.');
     }
   };
 
-  // Încărcare fișier HTML
-  const loadHTMLFile = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target.result;
-      const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-      const bodyContent = bodyMatch ? bodyMatch[1] : content;
-      editor?.commands.setContent(bodyContent);
-      setDocumentName(file.name.replace(/\.html$/, ''));
-      toast.success('Document încărcat cu succes');
-    };
-    reader.readAsText(file);
-    event.target.value = '';
+  const onDocumentLoadSuccess = ({ numPages: nextNumPages }) => {
+    setNumPages(nextNumPages);
   };
 
-  return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <FileText className="w-8 h-8 text-primary" />
-            <Input
-              value={documentName}
-              onChange={(e) => setDocumentName(e.target.value)}
-              className="text-xl font-semibold w-64 bg-transparent border-none focus:ring-0 px-2"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current.click()}>
-              Încarcă HTML
-            </Button>
-            <input type="file" ref={fileInputRef} className="hidden" accept=".html,.htm" onChange={loadHTMLFile} />
-            <Button variant="outline" size="sm" onClick={exportAsHTML}>
-              <Save className="w-4 h-4 mr-2" /> Salvare HTML
-            </Button>
-            <Button variant="default" size="sm" onClick={exportAsPDF} disabled={isExporting}>
-              <FileText className="w-4 h-4 mr-2" /> Export PDF
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setShowPreview(!showPreview)} title="Previzualizare">
-              {showPreview ? <X className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </Button>
-          </div>
-        </div>
+  const handleApplySignature = async () => {
+    if (signaturePadRef.current.isEmpty()) {
+      return toast.error('Semnătura este goală. Vă rugăm să desenați o semnătură.');
+    }
+    const signatureImage = signaturePadRef.current.getTrimmedCanvas().toDataURL('image/png');
 
-        {/* Toolbar */}
-        <Card className="mb-4 sticky top-0 z-10 bg-card/80 backdrop-blur-sm">
-          <CardContent className="p-2 flex flex-wrap gap-1 border-b">
-            <ToolbarButton onClick={undo} icon={Undo} title="Undo" />
-            <ToolbarButton onClick={redo} icon={Redo} title="Redo" />
-            <div className="w-px h-6 bg-border mx-1" />
-            <ToolbarButton onClick={toggleBold} isActive={editor?.isActive('bold')} icon={Bold} title="Bold" />
-            <ToolbarButton onClick={toggleItalic} isActive={editor?.isActive('italic')} icon={Italic} title="Italic" />
-            <ToolbarButton onClick={toggleUnderline} isActive={editor?.isActive('underline')} icon={UnderlineIcon} title="Underline" />
-            <ToolbarButton onClick={toggleStrike} isActive={editor?.isActive('strike')} icon={Strikethrough} title="Strikethrough" />
-            <div className="w-px h-6 bg-border mx-1" />
-            <ToolbarButton onClick={toggleBulletList} isActive={editor?.isActive('bulletList')} icon={List} title="Bullet List" />
-            <ToolbarButton onClick={toggleOrderedList} isActive={editor?.isActive('orderedList')} icon={ListOrdered} title="Numbered List" />
-            <div className="w-px h-6 bg-border mx-1" />
-            <ToolbarButton onClick={() => setTextAlign('left')} isActive={editor?.isActive({ textAlign: 'left' })} icon={AlignLeft} title="Align Left" />
-            <ToolbarButton onClick={() => setTextAlign('center')} isActive={editor?.isActive({ textAlign: 'center' })} icon={AlignCenter} title="Center" />
-            <ToolbarButton onClick={() => setTextAlign('right')} isActive={editor?.isActive({ textAlign: 'right' })} icon={AlignRight} title="Align Right" />
-            <ToolbarButton onClick={() => setTextAlign('justify')} isActive={editor?.isActive({ textAlign: 'justify' })} icon={AlignJustify} title="Justify" />
-            <div className="w-px h-6 bg-border mx-1" />
-            <ToolbarButton onClick={addImage} icon={ImageIcon} title="Insert Image" />
-            <ToolbarButton onClick={addTable} icon={TableIcon} title="Insert Table" />
-            <ToolbarButton onClick={() => editor?.chain().focus().setLink({ href: 'https://' }).run()} icon={LinkIcon} title="Insert Link" />
+    const fetchRes = await fetch(signatureImage);
+    const signatureBlob = await fetchRes.blob();
+
+    const formData = new FormData();
+    formData.append('file', pdfFile);
+    formData.append('signature_image', signatureBlob, 'signature.png');
+    formData.append('page', currentPage);
+    formData.append('x', textX);
+    formData.append('y', textY);
+
+    setIsProcessing(true);
+    toast.info('Se aplică semnătura pe document...');
+
+    try {
+      const response = await apiService.post('/process/sign', formData, {
+        responseType: 'blob',
+      });
+
+      const newPdfBlob = response.data;
+      setPdfFile(newPdfBlob);
+      setCurrentPage(1);
+      setShowSignModal(false);
+      toast.success('Semnătura a fost aplicată cu succes!');
+
+    } catch (error) {
+      console.error('Eroare la aplicarea semnăturii:', error);
+      toast.error(error.message || 'A apărut o eroare la aplicarea semnăturii.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const checkStirlingHealth = async () => {
+    toast.info("Se verifică starea serviciului Stirling PDF...");
+    try {
+        const response = await apiService.get('/stirling-health');
+        if (response.data.status === 'ok') {
+            setStirlingStatus('online');
+            toast.success("Serviciul Stirling PDF este online și funcțional.");
+        } else {
+            setStirlingStatus('offline');
+            toast.error("Serviciul Stirling PDF este offline.");
+        }
+    } catch (error) {
+        setStirlingStatus('offline');
+        toast.error("Nu s-a putut contacta serviciul Stirling PDF.");
+    }
+  };
+
+  const handleTranslate = async () => {
+    if (!textToTranslate) return;
+    setIsProcessing(true);
+    toast.info("Se traduce textul...");
+    try {
+      const formData = new FormData();
+      formData.append('text', textToTranslate);
+      formData.append('target_lang', 'ro');
+
+      const response = await apiService.post('/api/v1/ai/translate-text', formData);
+      setTextToTranslate(response.data.translated_text);
+      toast.success("Traducere finalizată!");
+    } catch (error) {
+      console.error('Eroare la traducere:', error);
+      toast.error(error.message || "S-a produs o eroare la traducerea textului.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+
+  return (
+    <div className="min-h-screen bg-muted/40 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        
+        <Card className="mb-4 shadow-sm border border-border">
+          <CardContent className="p-3 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              <span className="font-medium text-sm max-w-[200px] truncate">{documentName}</span>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Button variant="default" size="sm" onClick={() => fileInputRef.current.click()}>
+                <UploadCloud className="w-4 h-4 mr-2"/>
+                Încarcă PDF
+              </Button>
+              <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleLoadPdf} />
+              
+              <Button variant="outline" size="sm" onClick={() => setShowSignModal(true)} disabled={!pdfFile}>
+                <PenTool className="w-4 h-4 mr-2 text-blue-600" />
+                Semnează Document
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Editor content / preview */}
-        <div className="grid grid-cols-1 gap-4">
-          {!showPreview ? (
-            <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm min-h-[600px]">
-              <EditorContent editor={editor} className="prose max-w-none p-4" />
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm p-8 min-h-[600px] overflow-auto">
-              <div dangerouslySetInnerHTML={{ __html: editor?.getHTML() || '' }} />
-            </div>
-          )}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* PANOU DE CONTROL (STÂNGA) */}
+          <div className="lg:col-span-1 space-y-6">
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <h3 className="font-semibold text-sm">Navigare Document</h3>
+                <div className="flex items-center justify-between text-sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  >
+                    Anterior
+                  </Button>
+                  <span>{currentPage} / {numPages || '?'}</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    disabled={currentPage >= numPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, numPages))}
+                  >
+                    Următor
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <h3 className="font-semibold text-sm">Traducere Rapidă Text (RO)</h3>
+                <textarea 
+                  value={textToTranslate} 
+                  onChange={(e) => setTextToTranslate(e.target.value)} 
+                  placeholder="Introduceți text sau fraze legale pentru traducere instantanee..." 
+                  className="w-full text-xs p-2.5 rounded-lg border bg-background resize-none h-24 focus:ring-1 focus:ring-blue-500 outline-none" 
+                />
+                <Button className="w-full" size="sm" disabled={isProcessing || !textToTranslate} onClick={handleTranslate}>
+                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Languages className="w-4 h-4 mr-2"/>}
+                  Traducere Automată
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <h3 className="font-semibold text-sm">Poziționare Semnătură (A4 Px)</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Coordonata X</label>
+                    <Input type="number" value={textX} onChange={(e) => setTextX(e.target.value)} className="h-8 text-xs" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Coordonata Y</label>
+                    <Input type="number" value={textY} onChange={(e) => setTextY(e.target.value)} className="h-8 text-xs" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+                <CardContent className="p-4">
+                    <Button variant="secondary" className="w-full" onClick={checkStirlingHealth}>
+                        Verifică Stare Stirling Engine
+                    </Button>
+                    {stirlingStatus && (
+                        <div className="flex items-center mt-3 text-sm">
+                            <span className={`h-2 w-2 rounded-full mr-2 ${stirlingStatus === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                            {stirlingStatus === 'online' ? 'Serviciu Online' : 'Serviciu Offline'}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+          </div>
+
+          {/* ZONĂ CENTRALĂ DE AFIȘARE GRAFICĂ (DREAPTA) */}
+          <div className="lg:col-span-3 bg-white dark:bg-neutral-900 border rounded-lg shadow-inner flex items-center justify-center min-h-[80vh]">
+            {pdfFile ? (
+              <Document
+                file={pdfFile}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={(error) => toast.error(`Eroare la încărcarea PDF: ${error.message}`)}
+                loading={<Loader2 className="w-8 h-8 animate-spin text-primary"/>}
+                noData="Niciun PDF încărcat."
+              >
+                <Page pageNumber={currentPage} renderTextLayer={false} />
+              </Document>
+            ) : (
+              <div className="text-center text-muted-foreground p-8">
+                <ServerCrash className="w-16 h-16 mx-auto mb-4 text-gray-400"/>
+                <h3 className="font-semibold text-lg">Niciun document activ</h3>
+                <p className="text-sm mt-2">
+                  Încărcați un fișier de tip PDF din panoul superior pentru a activa motorul de randare grafică și semnare electronică.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
-        <p className="text-xs text-muted-foreground text-center mt-6">
-          Editor compatibil cu Microsoft Word. Exportă ca HTML și deschide fișierul în Word pentru editare avansată.
-        </p>
+        {/* MODAL DRAW SIGNATURE PAD BOARD */}
+        {showSignModal && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-2xl">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">Panou Semnătură Electronică</h2>
+                  <button onClick={() => setShowSignModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Desenează semnătura ta olografă în spațiul de mai jos folosind mausul sau ecranul tactil:
+                </p>
+                <div className="bg-muted rounded-lg border border-dashed">
+                  <SignaturePad
+                    ref={signaturePadRef}
+                    canvasProps={{
+                      className: 'w-full h-[200px] rounded-lg'
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground mt-2 flex justify-between">
+                    <span>Securizat local</span>
+                    <span>Pagina: {currentPage} • Poz: X:{textX}, Y:{textY}</span>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button variant="outline" size="sm" onClick={() => signaturePadRef.current?.clear()}>
+                    Curăță Canvas
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowSignModal(false)}>
+                    Anulează
+                  </Button>
+                  <Button size="sm" onClick={handleApplySignature} disabled={isProcessing}>
+                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : null}
+                    Aplică pe PDF
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

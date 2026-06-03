@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, Image as ImageIcon, Loader2, Languages, Download, Copy, Check, X, Eye } from 'lucide-react';
+import { Upload, Image as ImageIcon, Loader2, Languages, Download, Copy, Check, X, Eye, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -104,6 +104,10 @@ export default function Translate() {
               <button onClick={() => setFile(null)}><X /></button>
             </div>
           )}
+        </div>
+        <div className="mt-4 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-green-600" />
+          <span>Conexiune securizată. Fișierele sunt procesate pe serverele noastre și șterse automat.</span>
         </div>
         {file && (
           <div className="flex flex-col sm:flex-row gap-4 mt-6">

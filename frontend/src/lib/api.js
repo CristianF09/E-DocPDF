@@ -37,7 +37,31 @@ class ApiService {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail || `Cererea a eșuat cu status ${response.status}`);
     }
+
+    if (options.responseType === 'blob') {
+      return response.blob();
+    }
     return response.json();
+  }
+
+  async get(endpoint) {
+    return this._authenticatedRequest(endpoint, { method: 'GET' }).then(data => ({ data }));
+  }
+
+  async post(endpoint, body, options = {}) {
+    const headers = options.headers || {};
+    if (!(body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await this._authenticatedRequest(endpoint, {
+      method: 'POST',
+      headers,
+      body: body instanceof FormData ? body : JSON.stringify(body),
+      responseType: options.responseType
+    });
+
+    return { data: response };
   }
 
   async aiAnalyze(file) {
@@ -251,15 +275,42 @@ class ApiService {
     return response.blob();
   }
 
-  async convertToPDF(file) {
+  async rotatePDF(file, rotation = 90) {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await fetch(`${this.baseURL}/convert/to-pdf`, {
+    formData.append('rotation', String(rotation));
+    const response = await fetch(`${this.baseURL}/process/rotate`, {
       method: 'POST',
       headers: this._getAuthHeaders(),
       body: formData
     });
-    if (!response.ok) throw new Error('Conversia în PDF a eșuat');
+    if (!response.ok) throw new Error('Rotirea PDF-ului a eșuat');
+    return response.blob();
+  }
+
+  async protectPDF(file, password) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('password', password);
+    const response = await fetch(`${this.baseURL}/process/protect`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Protejarea PDF-ului a eșuat');
+    return response.blob();
+  }
+
+  async unlockPDF(file, password) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('password', password);
+    const response = await fetch(`${this.baseURL}/process/unlock`, {
+      method: 'POST',
+      headers: this._getAuthHeaders(),
+      body: formData
+    });
+    if (!response.ok) throw new Error('Deblocarea PDF-ului a eșuat');
     return response.blob();
   }
 
