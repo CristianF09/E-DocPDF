@@ -336,6 +336,8 @@ async def generate_legal_document_ai(request: LegalDocumentRequest, polish_with_
         return Response(content=polished, media_type='text/plain', headers={"Content-Disposition": f"attachment; filename={request.template_id}_ai.txt"})
 
 # ========== Endpoint-uri ==========
+import analytics
+
 @app.get("/")
 async def root():
     stirling_status = "connected" if check_stirling_health() else "disconnected"
@@ -353,6 +355,16 @@ async def root():
             "signatures": "/signatures"
         }
     }
+
+@app.post('/analytics/resume-analyze')
+async def resume_analyze(file: UploadFile = File(...), role: str = Form(None), use_ai: bool = Form(True), current_user: User = Depends(get_current_user)):
+    """Analizează CV-ul/Resume și returnează un raport structurat (folosind Gemini sau fallback local)."""
+    content = await file.read()
+    try:
+        result = analytics.analyze_resume(content, file.filename, role=role, use_ai=use_ai)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/stirling-health")
 async def stirling_health_check():
