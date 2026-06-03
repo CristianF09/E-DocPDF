@@ -31,9 +31,11 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          pdf: ['react-pdf', 'pdfjs-dist'],
-        },
+        manualChunks(id) {
+          if (id.includes('react-pdf') || id.includes('pdfjs-dist')) {
+            return 'pdf';
+          }
+        }
       },
     },
   },
