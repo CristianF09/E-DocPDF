@@ -65,6 +65,12 @@ else:
     LEGAL_TEMPLATES = {}
     print("⚠️ legal_templates.json not found in templates/ directory")
 
+# Directoare pentru fișiere încărcate și rezultate
+UPLOAD_DIR = BASE_DIR / 'uploads'
+OUTPUT_DIR = BASE_DIR / 'outputs'
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 # ========== Import local helper modules (fallbacks) ==========
 try:
     # app package is backend/app

@@ -295,8 +295,39 @@ export default function DocumentEditor() {
               </Button>
               <Button variant="default" size="sm" onClick={() => handleDownloadCurrentPdf()} disabled={!pdfFile} className="ml-2">
                 <Download className="w-4 h-4 mr-2" />
-                Salvează / Descarcă
+                              Descarcă
               </Button>
+                            <Button variant="secondary" size="sm" onClick={async () => {
+                              // Save current PDF to server
+                              try {
+                                const blob = await getPdfBlobFromState();
+                                if (!blob) { toast.error('Niciun PDF de salvat'); return; }
+                                const form = new FormData();
+                                form.append('file', blob, documentName || 'document.pdf');
+                                // if the document is part of documents_db, include id (optional)
+                                const docIdMatch = (documentName || '').match(/^(.+)_(.+)$/);
+                                if (docIdMatch) {
+                                  // not guaranteed; leave document_id empty by default
+                                }
+                                const res = await fetch(`${apiService.baseURL}/documents/save`, {
+                                  method: 'POST',
+                                  headers: apiService._getAuthHeaders(),
+                                  body: form
+                                });
+                                if (!res.ok) {
+                                  const err = await res.json().catch(() => ({}));
+                                  throw new Error(err.detail || 'Save failed');
+                                }
+                                const data = await res.json();
+                                toast.success('Document salvat pe server');
+                              } catch (e) {
+                                console.error('Save failed', e);
+                                toast.error(e.message || 'Salvare eșuată');
+                              }
+                            }} className="ml-2">
+                              <Save className="w-4 h-4 mr-2" />
+                              Salvează pe server
+                            </Button>
             </div>
           </CardContent>
         </Card>

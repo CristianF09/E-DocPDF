@@ -42,6 +42,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.3.0",
     "docx-preview": "^0.3.7",
+    "firebase": "^12.14.0",
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.17.0",
     "mammoth": "^1.12.0",
